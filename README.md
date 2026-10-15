@@ -29,13 +29,13 @@ GitHub Pages can only host static files, so it can't write to Google Calendar by
 3. Click **＋ → Script** to add a second file named `Settings`. Paste in [`apps-script/Settings.gs`](apps-script/Settings.gs) and fill it in:
    - `CALENDAR_ID`: paste the ID from Step 1.
    - `ALLOWED_EMAIL_DOMAIN`: for example `'@kernhigh.org'`, so only school emails are accepted.
-   - `NOTIFY_EMAIL`: where the full details of each booking, including notes, are emailed. Replying to that email goes to the requester.
+   - `NOTIFY_EMAIL`: who's told about each booking (comma-separated). They're added as guests, so Google Calendar emails them an invite with all the details and notes, and the delivery appears on their calendar. This works without Gmail, for example when mail is on Microsoft 365.
    - `CARTS`: cart names and Chromebook counts. The names must match `config.js`.
    - `DELIVERY_START` / `DELIVERY_END`: the hours I.T. can move carts. These must match `config.js`.
 
    Settings live in their own file so that a newer `Code.gs` can be pasted over the old one without losing them.
 4. Click the ⚙️ **Project Settings** and set the **Time zone** to your school's time zone. Booking times use this time zone.
-5. Back in the editor, choose the `testSetup` function from the dropdown and click **Run**. Approve the permissions prompt (calendar access, and sending email if `NOTIFY_EMAIL` is set). (You may see a "Google hasn't verified this app" screen. Click **Advanced → Go to project**. It's your own script.) The log should say `Connected to calendar: …`, and a test email is sent to `NOTIFY_EMAIL` if it's set.
+5. Back in the editor, choose the `testSetup` function from the dropdown and click **Run**. Approve the permissions prompt. (You may see a "Google hasn't verified this app" screen. Click **Advanced → Go to project**. It's your own script.) The log should say `Connected to calendar: …` and list who new bookings will invite.
 
 ## Step 3: Deploy it as a web app
 
@@ -85,7 +85,7 @@ Commit the change. The web app URL is safe to put in a public repo because it is
 - **Calendar.** The month calendar shows a colored dot for each cart booked on a day. Click a day to see the bookings, then click **Book this day** to add it to the form.
 - **Event format.** One calendar event is created per day. The title is `[Chromebook] Large Cart + Small Cart 1 — Jane Smith`, with the event location as the location and the details in the description. The script uses the `[Chromebook]` prefix to recognize bookings, so don't rename those events by hand.
 - **Cancelling.** Delete the event from Google Calendar, and the slot opens up again.
-- **Booking emails.** Each booking emails `NOTIFY_EMAIL` with the carts, total Chromebooks, dates, location, requester, contact person and notes. The notes are also in each calendar event's description.
+- **Notifications.** Each booked day is a calendar event that invites the requester and everyone in `NOTIFY_EMAIL`. The event description lists the total Chromebooks, carts, location, requester, contact person, notes, and every date in the request.
 - **Updating the script.** Paste the new `Code.gs` over the old one (`Settings.gs` stays as it is), then go to **Deploy → Manage deployments → ✏️ Edit → Version: New version → Deploy**. The URL stays the same.
 - **Spam.** The form has a hidden honeypot field, and `ALLOWED_EMAIL_DOMAIN` restricts submissions to school email addresses.
 

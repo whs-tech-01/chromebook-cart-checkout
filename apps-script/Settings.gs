@@ -12,8 +12,10 @@ const CALENDAR_ID = 'PASTE_CALENDAR_ID_HERE';
 // Only accept requests from emails ending in this domain. Leave as '' to accept any email.
 const ALLOWED_EMAIL_DOMAIN = '@kernhigh.org';
 
-// Who gets an email with the full details of every new booking. Separate several with commas.
-// Leave as '' to send no booking emails.
+// Who is notified of every new booking. Separate several with commas.
+// They're added as guests on each booking, so Google Calendar emails them an invite with the full
+// details and notes (this works without Gmail, e.g. when mail is on Microsoft 365).
+// Leave as '' to notify no one besides the requester.
 const NOTIFY_EMAIL = '';
 
 // Cart names and how many Chromebooks each holds. Names must match config.js.
