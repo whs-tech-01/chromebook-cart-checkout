@@ -71,10 +71,12 @@ function doPost(e) {
       return json_({ ok: false, error: 'Already booked: ' + conflicts.join('; ') + '. Please pick another cart or time.' });
     }
 
-    const title = TITLE_PREFIX + req.carts.join(CART_SEP) + NAME_SEP + req.name;
+    const who = req.contactName ? req.name + ' (for ' + req.contactName + ')' : req.name;
+    const title = TITLE_PREFIX + req.carts.join(CART_SEP) + NAME_SEP + who;
     const description = [
       'Requested by: ' + req.name,
       'Email: ' + req.email,
+      req.contactName ? 'Contact person: ' + req.contactName + (req.contactInfo ? ' (' + req.contactInfo + ')' : '') : '',
       'Carts: ' + req.carts.join(', '),
       'Location: ' + req.location,
       req.notes ? 'Notes: ' + req.notes : '',
@@ -147,6 +149,8 @@ function validate_(r, tz) {
     r[k] = String(r[k]).trim().slice(0, 200);
   }
   r.notes = r.notes ? String(r.notes).slice(0, 1000) : '';
+  r.contactName = r.contactName ? String(r.contactName).trim().slice(0, 200) : '';
+  r.contactInfo = r.contactName && r.contactInfo ? String(r.contactInfo).trim().slice(0, 200) : '';
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(r.email)) return 'Please enter a valid email.';
   if (ALLOWED_EMAIL_DOMAIN && !r.email.toLowerCase().endsWith(ALLOWED_EMAIL_DOMAIN.toLowerCase())) {
     return 'Please use your ' + ALLOWED_EMAIL_DOMAIN + ' email.';

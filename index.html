@@ -145,6 +145,11 @@
     }
     .hp, .sr-only { position: absolute; left: -9999px; }
 
+    /* Optional contact person */
+    .toggle { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; cursor: pointer; margin-top: -6px; }
+    .toggle input { width: 20px; height: 20px; accent-color: var(--green); }
+    .contact-box { margin-top: 12px; padding: 14px 14px 0; border-left: 4px solid var(--gold); background: var(--bg); border-radius: 0 8px 8px 0; }
+
     /* Cart checkboxes */
     .carts { display: grid; gap: 8px; }
     .cart-opt {
@@ -376,6 +381,22 @@
           </div>
         </div>
 
+        <div class="field">
+          <label class="toggle"><input type="checkbox" id="has-contact"> Someone else is the contact for this event</label>
+          <div class="contact-box" id="contact-box" hidden>
+            <div class="row">
+              <div class="field">
+                <label for="contactName">Contact person or group <span class="req">*</span></label>
+                <input id="contactName" name="contactName" placeholder="e.g. ASB, Ms. Lopez">
+              </div>
+              <div class="field">
+                <label for="contactInfo">Their email or phone</label>
+                <input id="contactInfo" name="contactInfo">
+              </div>
+            </div>
+          </div>
+        </div>
+
         <fieldset class="field" style="border:0;padding:0;margin:0 0 20px">
           <legend class="label">How many carts do you need? <span class="req">*</span></legend>
           <div class="carts" id="carts"></div>
@@ -463,6 +484,12 @@
     // ---------- Remembered fields ----------
     ["name", "email"].forEach((k) => {
       try { const v = localStorage.getItem("cart-" + k); if (v) $(k).value = v; } catch (e) {}
+    });
+
+    // ---------- Optional contact person ----------
+    $("has-contact").addEventListener("change", () => {
+      $("contact-box").hidden = !$("has-contact").checked;
+      if ($("has-contact").checked) $("contactName").focus();
     });
 
     // ---------- Cart checkboxes ----------
@@ -670,6 +697,10 @@
 
       if (!name) return fail("Please enter your name.", "name");
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail("Please enter a valid email.", "email");
+      const hasContact = $("has-contact").checked;
+      const contactName = hasContact ? $("contactName").value.trim() : "";
+      const contactInfo = hasContact ? $("contactInfo").value.trim() : "";
+      if (hasContact && !contactName) return fail("Please enter the contact person or group, or untick that box.", "contactName");
       if (!carts.length) return fail("Please choose at least one cart.");
       if (sessions.some((s) => !s.date)) return fail("Please pick a date for each day, or remove the empty row.");
       if (new Set(sessions.map((s) => s.date)).size !== sessions.length) return fail("The same date is listed twice.");
@@ -677,7 +708,7 @@
       if (!configured) return fail("This form isn't connected yet. Add the Web app URL to config.js.");
 
       msg.className = "msg";
-      openConfirm({ name, email, location, carts, sessions, notes: $("notes").value.trim(), website: $("website").value });
+      openConfirm({ name, email, contactName, contactInfo, location, carts, sessions, notes: $("notes").value.trim(), website: $("website").value });
     });
 
     // ---------- Confirmation modal ----------
@@ -703,6 +734,7 @@
             <dd>${escapeHtml(req.location)}</dd>
             <dt>Requested by</dt>
             <dd>${escapeHtml(req.name)}<br><span class="sub">${escapeHtml(req.email)}</span></dd>
+            ${req.contactName ? `<dt>Contact person</dt><dd>${escapeHtml(req.contactName)}${req.contactInfo ? `<br><span class="sub">${escapeHtml(req.contactInfo)}</span>` : ""}</dd>` : ""}
             ${req.notes ? `<dt>Notes</dt><dd>${escapeHtml(req.notes)}</dd>` : ""}
           </dl>
         </div>
@@ -772,6 +804,10 @@
       addSession();
       $("location").value = "";
       $("notes").value = "";
+      $("has-contact").checked = false;
+      $("contact-box").hidden = true;
+      $("contactName").value = "";
+      $("contactInfo").value = "";
       renderCalendar();
     }
 
