@@ -277,6 +277,8 @@
     .day-detail li { background: var(--bg); border-radius: 7px; padding: 8px 10px; font-size: .93rem; }
     .day-detail li .t { font-weight: 700; }
     .day-detail li .m { color: var(--muted); }
+    .day-detail .cart-list { display: flex; flex-wrap: wrap; gap: 2px 12px; }
+    .day-detail .cart-list span { white-space: nowrap; }
     .hint { color: var(--muted); margin: 0; font-size: .93rem; }
     .use-day {
       font: inherit; font-size: .85rem; font-weight: 700;
@@ -455,7 +457,7 @@
     const cfg = window.CART_CONFIG;
     const $ = (id) => document.getElementById(id);
     const configured = cfg.scriptUrl && !cfg.scriptUrl.startsWith("PASTE");
-    const CART_COLORS = ["#03462b", "#f9c906", "#ffffff", "#9c7a00", "#8fc3a4"];
+    const CART_COLORS = ["#03462b", "#f9c906", "#ffffff", "#8fc3a4", "#9c7a00"];
     const cartColor = (name) => CART_COLORS[cfg.carts.findIndex((c) => c.name === name) % CART_COLORS.length] || "#999";
 
     function escapeHtml(s) {
@@ -662,7 +664,7 @@
         body = list.length
           ? `<ul>${list.map((b) => `<li>
               <div class="t">${timeLabel(b.start)}–${timeLabel(b.end)}</div>
-              <div>${b.carts.map((c) => `<i class="dot" style="display:inline-block;background:${cartColor(c)}"></i> ${escapeHtml(c)}`).join("&nbsp;&nbsp;")}</div>
+              <div class="cart-list">${b.carts.map((c) => `<span><i class="dot" style="display:inline-block;background:${cartColor(c)}"></i> ${escapeHtml(c)}</span>`).join("")}</div>
               <div class="m">${escapeHtml(b.teacher)}${b.location ? " · " + escapeHtml(b.location) : ""}</div>
             </li>`).join("")}</ul>`
           : '<p class="hint">All carts are available this day.</p>';

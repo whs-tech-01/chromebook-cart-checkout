@@ -23,6 +23,7 @@ const CARTS = {
   'Large Cart': 40,
   'Small Cart 1': 36,
   'Small Cart 2': 36,
+  'Small Cart 3': 36,
 };
 
 // Send the requester a calendar invite for each booked date.

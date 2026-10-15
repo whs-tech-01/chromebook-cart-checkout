@@ -4,15 +4,16 @@ window.CART_CONFIG = {
   // It ends in /exec.
   scriptUrl: "https://script.google.com/macros/s/AKfycbzEIqrrIzTxpHVTKZRukyIHRk4O_brpiNPogvFB4rBj33IBonpjb08BBFbadlJyd-Tw/exec",
 
-  // The carts that can be reserved. Names must match CARTS in apps-script/Code.gs.
+  // The carts that can be reserved. Names must match CARTS in apps-script/Settings.gs.
   carts: [
     { name: "Large Cart", size: 40 },
     { name: "Small Cart 1", size: 36 },
     { name: "Small Cart 2", size: 36 },
+    { name: "Small Cart 3", size: 36 },
   ],
 
   // Carts can only be delivered during I.T. work hours (24-hour HH:MM).
-  // "Carts arrive" times are limited to this window. Must match DELIVERY_* in Code.gs.
+  // "Carts arrive" times are limited to this window. Must match DELIVERY_* in Settings.gs.
   deliveryStart: "07:30",
   deliveryEnd: "15:45",
 
