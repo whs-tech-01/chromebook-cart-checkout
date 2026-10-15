@@ -2,7 +2,7 @@
 window.CART_CONFIG = {
   // Paste your Apps Script "Web app URL" here (Step 3 in README.md).
   // It ends in /exec.
-  scriptUrl: "https://script.google.com/a/macros/kernhigh.org/s/AKfycbzEIqrrIzTxpHVTKZRukyIHRk4O_brpiNPogvFB4rBj33IBonpjb08BBFbadlJyd-Tw/exec",
+  scriptUrl: "https://script.google.com/macros/s/AKfycbzEIqrrIzTxpHVTKZRukyIHRk4O_brpiNPogvFB4rBj33IBonpjb08BBFbadlJyd-Tw/exec",
 
   // The carts teachers can reserve. Names must be unique.
   carts: [
