@@ -580,7 +580,7 @@
           if (!data.ok) throw new Error(data.error);
           entry.bookings = data.bookings; entry.status = "ok";
         })
-        .catch(() => { entry.status = "error"; })
+        .catch((err) => { entry.status = "error"; entry.error = err.message; })
         .finally(() => { renderCalendar(); checkConflicts(); });
       monthCache[key] = entry;
       return entry.promise;
@@ -655,7 +655,7 @@
       const head = `<h4><span>${dateLabel(selectedDay)}</span>${canUse ? '<button type="button" class="use-day" id="use-day">Book this day</button>' : ""}</h4>`;
       let body;
       if (!entry || entry.status === "loading") body = '<p class="hint">Loading…</p>';
-      else if (entry.status === "error") body = '<p class="hint">Couldn\'t load bookings. You can still submit a request.</p>';
+      else if (entry.status === "error") body = `<p class="hint">Couldn't load bookings${entry.error ? ` (${escapeHtml(entry.error)})` : ""}. You can still submit a request.</p>`;
       else {
         const list = bookingsOn(selectedDay).sort((a, b) => a.start.localeCompare(b.start));
         body = list.length
