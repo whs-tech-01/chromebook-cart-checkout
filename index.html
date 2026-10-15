@@ -335,6 +335,7 @@
     }
     .done h3 { margin: 0 0 6px; color: var(--green); font-size: 1.4rem; }
     .done p { margin: 0; color: var(--muted); }
+    .done .change-note { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
 
     footer { text-align: center; color: var(--muted); font-size: .95rem; padding: 0 16px 32px; }
   </style>
@@ -792,6 +793,7 @@
           <div class="check" aria-hidden="true"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
           <h3>You're booked!</h3>
           <p>${total} Chromebooks (${req.carts.map(escapeHtml).join(" + ")}) to ${escapeHtml(req.location)}.<br>A calendar invite is on its way to ${escapeHtml(req.email)}.</p>
+          <p class="change-note">Need to cancel or make a change? Email the <a href="mailto:${escapeHtml(cfg.contactEmail)}">tech office</a>.</p>
         </div>
         <div class="modal-actions"><button type="button" class="submit" id="confirm-done">Done</button></div>`;
       $("confirm-done").addEventListener("click", () => dialog.close());
