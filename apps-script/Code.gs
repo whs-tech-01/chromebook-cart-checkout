@@ -15,6 +15,41 @@ const NAME_SEP = ' — ';
 
 /** Book one or more carts for one or more dates. Called by the form with a JSON body. */
 function doPost(e) {
+  return safely_(function () { return book_(e); });
+}
+
+/** List bookings in a date range so the form can show a calendar: ?from=YYYY-MM-DD&to=YYYY-MM-DD (or ?date=YYYY-MM-DD) */
+function doGet(e) {
+  return safely_(function () { return list_(e); });
+}
+
+/** Always answer with JSON. An uncaught error would send an HTML page the form can't read. */
+function safely_(fn) {
+  try {
+    return fn();
+  } catch (err) {
+    console.error(err && err.stack ? err.stack : err);
+    return json_({
+      ok: false,
+      error: 'The calendar service had a temporary problem. Please try again in a moment. (' + (err && err.message ? err.message : err) + ')',
+    });
+  }
+}
+
+/** Retry Google's temporary errors ("too many requests", "server error", ...) with backoff. */
+function retry_(fn) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return fn();
+    } catch (err) {
+      if (attempt >= 4) throw err;
+      console.warn('Retrying after: ' + (err && err.message ? err.message : err));
+      Utilities.sleep(1000 * Math.pow(2, attempt) + Math.floor(Math.random() * 500));
+    }
+  }
+}
+
+function book_(e) {
   let req;
   try {
     req = JSON.parse(e.postData.contents);
@@ -28,14 +63,16 @@ function doPost(e) {
 
   // Lock so two people can't grab the same cart at the same moment.
   const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
+  if (!lock.tryLock(30000)) {
+    return json_({ ok: false, error: 'Lots of people are booking right now. Please try again in a moment.' });
+  }
   try {
-    const cal = CalendarApp.getCalendarById(CALENDAR_ID);
+    const cal = retry_(function () { return CalendarApp.getCalendarById(CALENDAR_ID); });
 
     // Check every date before booking any, so a request is all-or-nothing.
     const conflicts = [];
     req.sessions.forEach(function (s) {
-      bookingsBetween_(cal, s.startDate, s.endDate).forEach(function (b) {
+      retry_(function () { return bookingsBetween_(cal, s.startDate, s.endDate); }).forEach(function (b) {
         const taken = b.carts.filter(function (c) { return req.carts.indexOf(c) !== -1; });
         if (taken.length) {
           conflicts.push(taken.join(' and ') + ' on ' + Utilities.formatDate(b.start, tz, 'EEE MMM d') + ', ' +
@@ -71,9 +108,19 @@ function doPost(e) {
       options.guests = guests.join(',');
       options.sendInvites = true;
     }
-    req.sessions.forEach(function (s) {
-      cal.createEvent(title, s.startDate, s.endDate, options);
-    });
+    // All days or none: if Google fails partway, remove the days already created.
+    const created = [];
+    try {
+      req.sessions.forEach(function (s) {
+        created.push(retry_(function () { return cal.createEvent(title, s.startDate, s.endDate, options); }));
+      });
+    } catch (err) {
+      created.forEach(function (ev) {
+        try { ev.deleteEvent(); } catch (e2) { console.error('Rollback failed: ' + e2); }
+      });
+      throw err;
+    }
+    bumpVersion_();
   } finally {
     lock.releaseLock();
   }
@@ -81,8 +128,7 @@ function doPost(e) {
   return json_({ ok: true });
 }
 
-/** List bookings in a date range so the form can show a calendar: ?from=YYYY-MM-DD&to=YYYY-MM-DD (or ?date=YYYY-MM-DD) */
-function doGet(e) {
+function list_(e) {
   const p = (e && e.parameter) || {};
   const from = p.from || p.date;
   const to = p.to || p.date;
@@ -94,8 +140,16 @@ function doGet(e) {
   const end = new Date(Utilities.parseDate(to + ' 00:00', tz, 'yyyy-MM-dd HH:mm').getTime() + 24 * 60 * 60 * 1000);
   if (end <= start || end - start > 62 * 24 * 60 * 60 * 1000) return json_({ ok: false, error: 'Range too large.' });
 
-  const cal = CalendarApp.getCalendarById(CALENDAR_ID);
-  const bookings = bookingsBetween_(cal, start, end).map(function (b) {
+  // Cache each range for a minute so many people loading the calendar don't hit Calendar's limits.
+  // A new booking changes the version, so it shows up right away. Edits made directly in
+  // Google Calendar can take up to a minute to appear.
+  const cache = CacheService.getScriptCache();
+  const key = ['bookings', version_(), from, to].join(':');
+  const cached = cache.get(key);
+  if (cached) return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
+
+  const cal = retry_(function () { return CalendarApp.getCalendarById(CALENDAR_ID); });
+  const bookings = retry_(function () { return bookingsBetween_(cal, start, end); }).map(function (b) {
     return {
       date: Utilities.formatDate(b.start, tz, 'yyyy-MM-dd'),
       start: Utilities.formatDate(b.start, tz, 'HH:mm'),
@@ -105,7 +159,17 @@ function doGet(e) {
       location: b.location,
     };
   });
-  return json_({ ok: true, bookings: bookings });
+  const text = JSON.stringify({ ok: true, bookings: bookings });
+  try { cache.put(key, text, 60); } catch (err) { console.warn('Cache put failed: ' + err); }
+  return ContentService.createTextOutput(text).setMimeType(ContentService.MimeType.JSON);
+}
+
+function version_() {
+  return PropertiesService.getScriptProperties().getProperty('BOOKINGS_VERSION') || '0';
+}
+
+function bumpVersion_() {
+  PropertiesService.getScriptProperties().setProperty('BOOKINGS_VERSION', String(Date.now()));
 }
 
 function bookingsBetween_(cal, start, end) {

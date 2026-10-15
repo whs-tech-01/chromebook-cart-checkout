@@ -571,18 +571,41 @@
     const monthCache = {}; // "YYYY-MM" -> { status, bookings }
     const monthKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
 
+    // Reads JSON, turning Google's occasional HTML error page into a readable message.
+    async function getJson(url, options) {
+      const res = await fetch(url, options);
+      const text = await res.text();
+      try { return JSON.parse(text); }
+      catch (err) { throw new Error("The calendar service is busy right now. Please try again in a moment."); }
+    }
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    // At most two calendar lookups at a time, so a long multi-month request doesn't flood the script.
+    let activeLoads = 0;
+    const queuedLoads = [];
+    function limited(fn) {
+      return new Promise((resolve, reject) => {
+        const run = () => {
+          activeLoads++;
+          fn().then(resolve, reject).finally(() => { activeLoads--; if (queuedLoads.length) queuedLoads.shift()(); });
+        };
+        activeLoads < 2 ? run() : queuedLoads.push(run);
+      });
+    }
+
     async function loadMonth(key, force) {
       if (!configured) return;
       if (monthCache[key] && !force) return monthCache[key].promise;
       const [y, m] = key.split("-").map(Number);
       const from = `${key}-01`, to = iso(new Date(y, m, 0));
       const entry = { status: "loading", bookings: [] };
-      entry.promise = fetch(`${cfg.scriptUrl}?from=${from}&to=${to}`)
-        .then((r) => r.json())
-        .then((data) => {
-          if (!data.ok) throw new Error(data.error);
-          entry.bookings = data.bookings; entry.status = "ok";
-        })
+      const fetchMonth = async () => {
+        const data = await getJson(`${cfg.scriptUrl}?from=${from}&to=${to}`);
+        if (!data.ok) throw new Error(data.error);
+        return data;
+      };
+      entry.promise = limited(() => fetchMonth().catch(() => wait(1500).then(fetchMonth))) // one retry
+        .then((data) => { entry.bookings = data.bookings; entry.status = "ok"; })
         .catch((err) => { entry.status = "error"; entry.error = err.message; })
         .finally(() => { renderCalendar(); checkConflicts(); });
       monthCache[key] = entry;
@@ -770,8 +793,7 @@
       cmsg.className = "msg modal-msg";
       try {
         // text/plain avoids a CORS preflight, which Apps Script doesn't support.
-        const res = await fetch(cfg.scriptUrl, { method: "POST", body: JSON.stringify(req) });
-        const out = await res.json();
+        const out = await getJson(cfg.scriptUrl, { method: "POST", body: JSON.stringify(req) });
         if (!out.ok) throw new Error(out.error || "Something went wrong.");
         ["name", "email"].forEach((k) => { try { localStorage.setItem("cart-" + k, req[k]); } catch (err) {} });
         new Set(req.sessions.map((s) => s.date.slice(0, 7))).forEach((k) => loadMonth(k, true));
