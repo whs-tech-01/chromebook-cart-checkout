@@ -13,6 +13,8 @@ const TITLE_PREFIX = '[Chromebook] ';
 const CART_SEP = ' + ';
 const NAME_SEP = ' — ';
 const CACHE_SECONDS = 180;
+const WARM_MINUTES = 5;
+let lastSource_ = '';
 
 /** Book one or more carts for one or more dates. Called by the form with a JSON body. */
 function doPost(e) {
@@ -141,14 +143,22 @@ function list_(e) {
   const end = new Date(Utilities.parseDate(to + ' 00:00', tz, 'yyyy-MM-dd HH:mm').getTime() + 24 * 60 * 60 * 1000);
   if (end <= start || end - start > 62 * 24 * 60 * 60 * 1000) return json_({ ok: false, error: 'Range too large.' });
 
-  // Cache each range for a few minutes so most page loads skip Calendar entirely.
+  // Most requests are answered from the cache, which warmCache() refreshes every few minutes.
   // A new booking changes the version, so it shows up right away. Edits made directly in
-  // Google Calendar can take up to CACHE_SECONDS to appear.
-  const cache = CacheService.getScriptCache();
-  const key = ['bookings', version_(), from, to].join(':');
-  const cached = cache.get(key);
+  // Google Calendar appear within about WARM_MINUTES.
+  const cached = CacheService.getScriptCache().get(cacheKey_(from, to));
   if (cached) return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(refreshRange_(from, to, start, end, CACHE_SECONDS)).setMimeType(ContentService.MimeType.JSON);
+}
 
+function cacheKey_(from, to) {
+  return ['bookings', version_(), from, to].join(':');
+}
+
+/** Read bookings for a date range from Calendar, cache the JSON, and return it. */
+function refreshRange_(from, to, start, end, seconds) {
+  const tz = Session.getScriptTimeZone();
+  const began = Date.now();
   const bookings = retry_(function () { return bookingsBetween_(null, start, end); }).map(function (b) {
     return {
       date: Utilities.formatDate(b.start, tz, 'yyyy-MM-dd'),
@@ -159,9 +169,28 @@ function list_(e) {
       location: b.location,
     };
   });
-  const text = JSON.stringify({ ok: true, bookings: bookings });
-  try { cache.put(key, text, CACHE_SECONDS); } catch (err) { console.warn('Cache put failed: ' + err); }
-  return ContentService.createTextOutput(text).setMimeType(ContentService.MimeType.JSON);
+  // "source" and "ms" are for troubleshooting: which reader ran and how long it took.
+  const text = JSON.stringify({ ok: true, bookings: bookings, source: lastSource_, ms: Date.now() - began });
+  try { CacheService.getScriptCache().put(cacheKey_(from, to), text, seconds); } catch (err) { console.warn('Cache put failed: ' + err); }
+  return text;
+}
+
+/**
+ * Runs every few minutes (installed by testSetup) so the calendar is already cached
+ * for this month and the next two when people open the form.
+ */
+function warmCache() {
+  const tz = Session.getScriptTimeZone();
+  const now = new Date();
+  for (let i = 0; i < 3; i++) {
+    const first = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const last = new Date(now.getFullYear(), now.getMonth() + i + 1, 0);
+    const from = Utilities.formatDate(first, tz, 'yyyy-MM-dd');
+    const to = Utilities.formatDate(last, tz, 'yyyy-MM-dd');
+    const start = Utilities.parseDate(from + ' 00:00', tz, 'yyyy-MM-dd HH:mm');
+    const end = new Date(Utilities.parseDate(to + ' 00:00', tz, 'yyyy-MM-dd HH:mm').getTime() + 24 * 60 * 60 * 1000);
+    refreshRange_(from, to, start, end, WARM_MINUTES * 60 * 2);
+  }
 }
 
 function bookingsViaApi_(start, end) {
@@ -207,7 +236,16 @@ function bumpVersion_() {
  * CalendarApp, which makes a slow call for every property of every event.
  */
 function bookingsBetween_(cal, start, end) {
-  if (typeof Calendar !== 'undefined') return bookingsViaApi_(start, end);
+  if (typeof Calendar !== 'undefined') {
+    try {
+      const result = bookingsViaApi_(start, end);
+      lastSource_ = 'api';
+      return result;
+    } catch (err) {
+      console.error('Calendar API failed, using CalendarApp instead: ' + err);
+    }
+  }
+  lastSource_ = 'calendarapp';
   cal = cal || CalendarApp.getCalendarById(CALENDAR_ID);
   return cal.getEvents(start, end)
     .filter(function (ev) { return ev.getTitle().indexOf(TITLE_PREFIX) === 0; })
@@ -294,5 +332,16 @@ function testSetup() {
   Logger.log(typeof Calendar !== 'undefined'
     ? 'Google Calendar API service is on (fast calendar loading).'
     : 'Add Services > Google Calendar API for much faster calendar loading.');
+
+  // Keep the calendar cache warm so the form loads quickly.
+  ScriptApp.getProjectTriggers()
+    .filter(function (t) { return t.getHandlerFunction() === 'warmCache'; })
+    .forEach(function (t) { ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('warmCache').timeBased().everyMinutes(WARM_MINUTES).create();
+  const began = Date.now();
+  warmCache();
+  Logger.log('Calendar cache warmed in ' + (Date.now() - began) + ' ms using ' + lastSource_ +
+    ', and set to refresh every ' + WARM_MINUTES + ' minutes.');
+
   Logger.log(notifyList_().length ? 'New bookings will invite: ' + notifyList_().join(', ') : 'NOTIFY_EMAIL is empty, so only the requester is invited.');
 }

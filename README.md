@@ -36,7 +36,7 @@ GitHub Pages can only host static files, so it can't write to Google Calendar by
    Settings live in their own file so that a newer `Code.gs` can be pasted over the old one without losing them.
 4. Turn on the faster calendar reader: in the left sidebar click **Services ＋ → Google Calendar API → Add**. It's optional but makes the cart calendar load much faster.
 5. Click the ⚙️ **Project Settings** and set the **Time zone** to your school's time zone. Booking times use this time zone.
-6. Back in the editor, choose the `testSetup` function from the dropdown and click **Run**. Approve the permissions prompt. (You may see a "Google hasn't verified this app" screen. Click **Advanced → Go to project**. It's your own script.) The log should say `Connected to calendar: …` and list who new bookings will invite.
+6. Back in the editor, choose the `testSetup` function from the dropdown and click **Run**. Approve the permissions prompt. (You may see a "Google hasn't verified this app" screen. Click **Advanced → Go to project**. It's your own script.) The log should say `Connected to calendar: …`, how long warming the calendar cache took, and who new bookings will invite. `testSetup` also installs a trigger that refreshes the calendar cache every 5 minutes, so the form loads quickly. It's safe to run again.
 
 ## Step 3: Deploy it as a web app
 
