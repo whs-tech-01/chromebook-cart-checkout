@@ -4,34 +4,10 @@
  * Runs under YOUR Google account and writes reservations to your calendar.
  * The GitHub Pages form sends requests here; nothing secret lives on GitHub.
  *
- * Setup: see README.md, Step 2.
+ * Setup: see README.md, Step 2. Settings are in Settings.gs.
  */
 
-// ===== SETTINGS =====
-
-// Calendar ID from Google Calendar > Settings > (your calendar) > "Integrate calendar" > Calendar ID.
-// Looks like abc123...@group.calendar.google.com, or your own email for your main calendar.
-// This is NOT the "secret address in iCal format".
-const CALENDAR_ID = 'PASTE_CALENDAR_ID_HERE';
-
-// Only accept requests from emails ending in this domain (e.g. '@yourschool.org').
-// Leave as '' to accept any email.
-const ALLOWED_EMAIL_DOMAIN = '';
-
-// Must match the cart names in config.js.
-const CARTS = ['Large Cart', 'Small Cart 1', 'Small Cart 2'];
-
-// Send the requester a calendar invite for each booked date.
-const INVITE_REQUESTER = true;
-
-// Most dates one request can book.
-const MAX_DATES = 10;
-
-// Carts can only be delivered during these hours (24-hour HH:MM). Must match config.js.
-const DELIVERY_START = '07:30';
-const DELIVERY_END = '15:45';
-
-// ===== END SETTINGS =====
+// Settings (CALENDAR_ID, CARTS, NOTIFY_EMAIL, ...) live in Settings.gs.
 
 const TITLE_PREFIX = '[Chromebook] ';
 const CART_SEP = ' + ';
@@ -92,6 +68,13 @@ function doPost(e) {
     });
   } finally {
     lock.releaseLock();
+  }
+
+  // The booking is already saved, so an email problem shouldn't fail the request.
+  try {
+    notify_(req, tz);
+  } catch (err) {
+    console.error('Booking email failed: ' + err);
   }
 
   return json_({ ok: true });
@@ -157,8 +140,9 @@ function validate_(r, tz) {
   }
 
   if (!Array.isArray(r.carts) || !r.carts.length) return 'Please choose at least one cart.';
-  if (r.carts.some(function (c) { return CARTS.indexOf(c) === -1; })) return 'Unknown cart.';
-  r.carts = CARTS.filter(function (c) { return r.carts.indexOf(c) !== -1; }); // dedupe, keep standard order
+  const cartNames = Object.keys(CARTS);
+  if (r.carts.some(function (c) { return cartNames.indexOf(c) === -1; })) return 'Unknown cart.';
+  r.carts = cartNames.filter(function (c) { return r.carts.indexOf(c) !== -1; }); // dedupe, keep standard order
 
   if (!Array.isArray(r.sessions) || !r.sessions.length) return 'Please add at least one date.';
   if (r.sessions.length > MAX_DATES) return 'Please book at most ' + MAX_DATES + ' dates at a time.';
@@ -171,12 +155,54 @@ function validate_(r, tz) {
     s.startDate = Utilities.parseDate(s.date + ' ' + s.start, tz, 'yyyy-MM-dd HH:mm');
     s.endDate = Utilities.parseDate(s.date + ' ' + s.end, tz, 'yyyy-MM-dd HH:mm');
     if (s.start < DELIVERY_START || s.start > DELIVERY_END) {
-      return 'Carts can only be delivered between ' + DELIVERY_START + ' and ' + DELIVERY_END + '.';
+      const at = function (t) { return fmtTime_(Utilities.parseDate(s.date + ' ' + t, tz, 'yyyy-MM-dd HH:mm'), tz); };
+      return 'Carts can only be delivered between ' + at(DELIVERY_START) + ' and ' + at(DELIVERY_END) + '.';
     }
     if (s.endDate <= s.startDate) return 'End time must be after start time.';
     if (s.endDate < now) return 'One of your dates has already passed.';
   }
   return null;
+}
+
+/** Email the full request to NOTIFY_EMAIL. Replying goes to the requester. */
+function notify_(req, tz) {
+  if (!NOTIFY_EMAIL) return;
+  const total = req.carts.reduce(function (n, c) { return n + CARTS[c]; }, 0);
+  const days = req.sessions.slice().sort(function (a, b) { return a.startDate - b.startDate; });
+  const dayText = function (s) {
+    return Utilities.formatDate(s.startDate, tz, 'EEE, MMM d') + ': carts arrive ' + fmtTime_(s.startDate, tz) +
+      ', event ends ' + fmtTime_(s.endDate, tz);
+  };
+  const firstDay = Utilities.formatDate(days[0].startDate, tz, 'MMM d');
+  const lastDay = Utilities.formatDate(days[days.length - 1].startDate, tz, 'MMM d');
+  const subject = 'Chromebook cart booking: ' + req.carts.join(' + ') + ' · ' +
+    (firstDay === lastDay ? firstDay : firstDay + '–' + lastDay) + ' · ' + req.location;
+
+  const rows = [
+    ['Chromebooks', total + ' (' + req.carts.map(function (c) { return c + ': ' + CARTS[c]; }).join(', ') + ')'],
+    [days.length > 1 ? 'Dates' : 'Date', days.map(dayText).join('\n')],
+    ['Location', req.location],
+    ['Requested by', req.name + ' <' + req.email + '>'],
+  ];
+  if (req.contactName) rows.push(['Contact person', req.contactName + (req.contactInfo ? ' (' + req.contactInfo + ')' : '')]);
+  rows.push(['Notes', req.notes || '(none)']);
+
+  const esc = function (v) {
+    return String(v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; });
+  };
+  const html =
+    '<div style="font-family:Arial,sans-serif;max-width:560px;border:1px solid #c9d6ce;border-radius:8px;overflow:hidden">' +
+    '<div style="background:#03462b;color:#f9c906;padding:14px 18px;font-size:18px;font-weight:bold;border-bottom:4px solid #f9c906">' +
+    'New Chromebook cart booking</div><table style="border-collapse:collapse;width:100%;font-size:14px">' +
+    rows.map(function (r) {
+      return '<tr><td style="padding:8px 18px;font-weight:bold;color:#03462b;vertical-align:top;white-space:nowrap">' + esc(r[0]) +
+        '</td><td style="padding:8px 18px 8px 0">' + esc(r[1]).replace(/\n/g, '<br>') + '</td></tr>';
+    }).join('') +
+    '</table><div style="padding:10px 18px;color:#55655c;font-size:12px">Reply to this email to reach ' + esc(req.name) +
+    '. The booking is on the cart calendar.</div></div>';
+  const text = rows.map(function (r) { return r[0] + ': ' + r[1]; }).join('\n');
+
+  MailApp.sendEmail({ to: NOTIFY_EMAIL, replyTo: req.email, name: 'Chromebook Cart Checkout', subject: subject, body: text, htmlBody: html });
 }
 
 function fmtTime_(d, tz) {
@@ -192,4 +218,8 @@ function testSetup() {
   const cal = CalendarApp.getCalendarById(CALENDAR_ID);
   if (!cal) throw new Error('Calendar not found. Check CALENDAR_ID.');
   Logger.log('Connected to calendar: ' + cal.getName() + ' (time zone ' + Session.getScriptTimeZone() + ')');
+  if (NOTIFY_EMAIL) {
+    MailApp.sendEmail(NOTIFY_EMAIL, 'Chromebook Cart Checkout: test email', 'Booking emails from the cart checkout form will arrive at this address.');
+    Logger.log('Sent a test email to ' + NOTIFY_EMAIL);
+  }
 }
