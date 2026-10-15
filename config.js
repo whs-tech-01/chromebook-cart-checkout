@@ -20,6 +20,9 @@ window.CART_CONFIG = {
   // Latest time an event can end (24-hour HH:MM).
   dayEnd: "22:00",
 
+  // Requesters must use an email ending in this domain. Must match ALLOWED_EMAIL_DOMAIN in Settings.gs.
+  emailDomain: "@kernhigh.org",
+
   // "Questions? Contact the tech office." links to this address.
   contactEmail: "whs@khsd.freshdesk.com",
 };

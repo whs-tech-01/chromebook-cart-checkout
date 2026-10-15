@@ -146,6 +146,17 @@
     .hp, .sr-only { position: absolute; left: -9999px; }
 
     /* Optional contact person */
+    .field-note {
+      margin: 6px 0 0; padding: 7px 10px; border-radius: 6px;
+      font-size: .88rem; font-weight: 600; line-height: 1.35;
+    }
+    .field-note.warn { background: var(--gold-soft); border-left: 4px solid var(--gold-dark); color: var(--warn); }
+    .field-note.err { background: var(--error-bg); border-left: 4px solid var(--error); color: var(--error); }
+    .email-check {
+      margin: 16px 20px 0; padding: 12px 14px; border-radius: 8px;
+      background: var(--gold-soft); border: 1.5px solid var(--gold-dark); color: var(--warn); font-weight: 600;
+    }
+    .email-check b { color: var(--ink); }
     .toggle { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; cursor: pointer; margin-top: -6px; }
     .toggle input { width: 20px; height: 20px; accent-color: var(--green); }
     .contact-box { margin-top: 12px; padding: 14px 14px 0; border-left: 4px solid var(--gold); background: var(--bg); border-radius: 0 8px 8px 0; }
@@ -380,7 +391,8 @@
           </div>
           <div class="field">
             <label for="email">School email <span class="req">*</span></label>
-            <input id="email" name="email" type="email" autocomplete="email">
+            <input id="email" name="email" type="email" autocomplete="email" aria-describedby="email-note">
+            <p class="field-note" id="email-note" role="status" hidden></p>
           </div>
         </div>
 
@@ -484,6 +496,43 @@
 
     // ---------- Footer ----------
     $("footer").innerHTML = `Questions? Contact the <a href="mailto:${escapeHtml(cfg.contactEmail)}">tech office</a>.`;
+
+    // ---------- Email check ----------
+    // Must end in the district domain. Should look like first_last or FLast and match the name;
+    // those two are only warnings, since some staff addresses differ.
+    const lettersOnly = (s) => s.toLowerCase().replace(/[^a-z]/g, "");
+    function emailIssue(email, name) {
+      const domain = (cfg.emailDomain || "").toLowerCase();
+      if (!email) return null;
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { level: "err", text: "Please enter a valid email address." };
+      if (domain && !email.toLowerCase().endsWith(domain)) return { level: "err", text: `Please use your ${cfg.emailDomain} email.` };
+      const local = email.slice(0, email.lastIndexOf("@"));
+      const word = "[a-z]+(?:['-][a-z]+)*";
+      if (!new RegExp(`^${word}(?:_${word})?$`, "i").test(local)) {
+        return { level: "warn", text: `Are you sure this is correct? District emails usually look like first_last${cfg.emailDomain} or FLast${cfg.emailDomain}.` };
+      }
+      const words = name.trim().split(/\s+/).map(lettersOnly).filter(Boolean);
+      if (words.length >= 2) {
+        const first = words[0];
+        const lasts = words.slice(1).map((_, i) => words.slice(i + 1).join("")); // "de la cruz" -> delacruz, lacruz, cruz
+        const expected = lasts.flatMap((last) => [`${first}_${last}`, `${first[0]}${last}`]);
+        const given = local.toLowerCase().replace(/['-]/g, "");
+        if (!expected.includes(given)) {
+          return { level: "warn", text: `Are you sure this is correct? It doesn't match your name, and your calendar invite will be sent here.` };
+        }
+      }
+      return null;
+    }
+    function showEmailNote() {
+      const issue = emailIssue($("email").value.trim(), $("name").value);
+      const note = $("email-note");
+      note.hidden = !issue;
+      if (issue) { note.className = "field-note " + issue.level; note.textContent = (issue.level === "warn" ? "⚠ " : "") + issue.text; }
+      return issue;
+    }
+    $("email").addEventListener("blur", showEmailNote);
+    $("name").addEventListener("blur", () => { if ($("email").value.trim()) showEmailNote(); });
+    $("email").addEventListener("input", () => { if (!$("email-note").hidden) showEmailNote(); });
 
     // ---------- Remembered fields ----------
     ["name", "email"].forEach((k) => {
@@ -767,7 +816,9 @@
       const sessions = getSessions().map(({ date, start, end }) => ({ date, start, end }));
 
       if (!name) return fail("Please enter your name.", "name");
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail("Please enter a valid email.", "email");
+      if (!email) return fail("Please enter your school email.", "email");
+      const issue = showEmailNote();
+      if (issue && issue.level === "err") return fail(issue.text, "email");
       const hasContact = $("has-contact").checked;
       const contactName = hasContact ? $("contactName").value.trim() : "";
       const contactInfo = hasContact ? $("contactInfo").value.trim() : "";
@@ -809,6 +860,7 @@
             ${req.notes ? `<dt>Notes</dt><dd>${escapeHtml(req.notes)}</dd>` : ""}
           </dl>
         </div>
+        ${emailIssue(req.email, req.name) ? `<div class="email-check" role="alert">⚠ Please double-check your email: <b>${escapeHtml(req.email)}</b>. ${escapeHtml(emailIssue(req.email, req.name).text.replace("Are you sure this is correct? ", ""))} If it's wrong, click Go back to fix it.</div>` : ""}
         <fieldset class="acks" style="border-style:solid">
           <legend class="sr-only">Agreements</legend>
           <p class="acks-title">Please confirm:</p>
