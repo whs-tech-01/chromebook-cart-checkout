@@ -16,6 +16,11 @@ const CACHE_SECONDS = 180;
 const WARM_MINUTES = 5;
 let lastSource_ = '';
 
+// Where publishBookings_ writes the calendar for the site. Override in Settings.gs if the repo moves.
+const GITHUB_REPO_ = typeof GITHUB_REPO !== 'undefined' ? GITHUB_REPO : 'whs-tech-01/chromebook-cart-checkout';
+const GITHUB_BRANCH_ = typeof GITHUB_BRANCH !== 'undefined' ? GITHUB_BRANCH : 'main';
+const DATA_PATH = 'data/bookings.json';
+
 /** Book one or more carts for one or more dates. Called by the form with a JSON body. */
 function doPost(e) {
   return safely_(function () { return book_(e); });
@@ -128,6 +133,12 @@ function book_(e) {
     lock.releaseLock();
   }
 
+  // Update the site's copy of the calendar so other people see this booking within a minute or two.
+  try {
+    publishBookings_();
+  } catch (err) {
+    console.error('Publish after booking failed: ' + (err && err.message ? err.message : err));
+  }
   return json_({ ok: true });
 }
 
@@ -159,16 +170,7 @@ function cacheKey_(from, to) {
 function refreshRange_(from, to, start, end, seconds) {
   const tz = Session.getScriptTimeZone();
   const began = Date.now();
-  const bookings = retry_(function () { return bookingsBetween_(null, start, end); }).map(function (b) {
-    return {
-      date: Utilities.formatDate(b.start, tz, 'yyyy-MM-dd'),
-      start: Utilities.formatDate(b.start, tz, 'HH:mm'),
-      end: Utilities.formatDate(b.end, tz, 'HH:mm'),
-      carts: b.carts,
-      teacher: b.teacher,
-      location: b.location,
-    };
-  });
+  const bookings = retry_(function () { return bookingsBetween_(null, start, end); }).map(function (b) { return toPublic_(b, tz); });
   // "source" and "ms" are for troubleshooting: which reader ran and how long it took.
   const text = JSON.stringify({ ok: true, bookings: bookings, source: lastSource_, ms: Date.now() - began });
   try { CacheService.getScriptCache().put(cacheKey_(from, to), text, seconds); } catch (err) { console.warn('Cache put failed: ' + err); }
@@ -179,6 +181,69 @@ function refreshRange_(from, to, start, end, seconds) {
  * Runs every few minutes (installed by testSetup) so the calendar is already cached
  * for this month and the next two when people open the form.
  */
+/** The booking fields the form shows. */
+function toPublic_(b, tz) {
+  return {
+    date: Utilities.formatDate(b.start, tz, 'yyyy-MM-dd'),
+    start: Utilities.formatDate(b.start, tz, 'HH:mm'),
+    end: Utilities.formatDate(b.end, tz, 'HH:mm'),
+    carts: b.carts,
+    teacher: b.teacher,
+    location: b.location,
+  };
+}
+
+/**
+ * Publish bookings from last month through the next 12 months to data/bookings.json on GitHub,
+ * so the form can load the calendar from its own site instead of waiting on this script.
+ * Needs a GITHUB_TOKEN script property (see README). Only commits when something changed.
+ */
+function publishBookings_() {
+  const props = PropertiesService.getScriptProperties();
+  const token = props.getProperty('GITHUB_TOKEN');
+  if (!token) return 'skipped: no GITHUB_TOKEN script property';
+
+  const tz = Session.getScriptTimeZone();
+  const now = new Date();
+  const from = Utilities.formatDate(new Date(now.getFullYear(), now.getMonth() - 1, 1), tz, 'yyyy-MM-dd');
+  const to = Utilities.formatDate(new Date(now.getFullYear(), now.getMonth() + 13, 0), tz, 'yyyy-MM-dd');
+  const start = Utilities.parseDate(from + ' 00:00', tz, 'yyyy-MM-dd HH:mm');
+  const end = new Date(Utilities.parseDate(to + ' 00:00', tz, 'yyyy-MM-dd HH:mm').getTime() + 24 * 60 * 60 * 1000);
+  const bookings = retry_(function () { return bookingsBetween_(null, start, end); })
+    .map(function (b) { return toPublic_(b, tz); })
+    .sort(function (a, b) { return (a.date + a.start).localeCompare(b.date + b.start); });
+
+  const body = JSON.stringify({ from: from, to: to, bookings: bookings });
+  const hash = Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, body, Utilities.Charset.UTF_8));
+  if (hash === props.getProperty('PUBLISHED_HASH')) return 'unchanged';
+
+  const content = JSON.stringify({ updated: now.toISOString(), from: from, to: to, bookings: bookings });
+  const url = 'https://api.github.com/repos/' + GITHUB_REPO_ + '/contents/' + DATA_PATH;
+  const headers = { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+  for (let attempt = 0; ; attempt++) {
+    const current = UrlFetchApp.fetch(url + '?ref=' + encodeURIComponent(GITHUB_BRANCH_), { headers: headers, muteHttpExceptions: true });
+    const sha = current.getResponseCode() === 200 ? JSON.parse(current.getContentText()).sha : undefined;
+    const res = UrlFetchApp.fetch(url, {
+      method: 'put',
+      contentType: 'application/json',
+      headers: headers,
+      muteHttpExceptions: true,
+      payload: JSON.stringify({
+        message: 'Update cart bookings (' + bookings.length + ')',
+        content: Utilities.base64Encode(content, Utilities.Charset.UTF_8),
+        branch: GITHUB_BRANCH_,
+        sha: sha,
+      }),
+    });
+    const code = res.getResponseCode();
+    if (code < 300) break;
+    if (code === 409 && attempt < 2) continue; // file changed underneath us; fetch the new sha and retry
+    throw new Error('GitHub publish failed (' + code + '): ' + res.getContentText().slice(0, 300));
+  }
+  props.setProperty('PUBLISHED_HASH', hash);
+  return 'published ' + bookings.length + ' bookings';
+}
+
 function warmCache() {
   const tz = Session.getScriptTimeZone();
   const now = new Date();
@@ -190,6 +255,14 @@ function warmCache() {
     const start = Utilities.parseDate(from + ' 00:00', tz, 'yyyy-MM-dd HH:mm');
     const end = new Date(Utilities.parseDate(to + ' 00:00', tz, 'yyyy-MM-dd HH:mm').getTime() + 24 * 60 * 60 * 1000);
     refreshRange_(from, to, start, end, WARM_MINUTES * 60 * 2);
+  }
+  try {
+    const result = publishBookings_();
+    console.log('Publish: ' + result);
+    return result;
+  } catch (err) {
+    console.error(err && err.message ? err.message : err);
+    return 'FAILED: ' + (err && err.message ? err.message : err);
   }
 }
 
@@ -338,10 +411,12 @@ function testSetup() {
     .filter(function (t) { return t.getHandlerFunction() === 'warmCache'; })
     .forEach(function (t) { ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('warmCache').timeBased().everyMinutes(WARM_MINUTES).create();
+  PropertiesService.getScriptProperties().deleteProperty('PUBLISHED_HASH'); // force a fresh publish
   const began = Date.now();
-  warmCache();
+  const published = warmCache();
   Logger.log('Calendar cache warmed in ' + (Date.now() - began) + ' ms using ' + lastSource_ +
     ', and set to refresh every ' + WARM_MINUTES + ' minutes.');
+  Logger.log('Publishing to GitHub: ' + published);
 
   Logger.log(notifyList_().length ? 'New bookings will invite: ' + notifyList_().join(', ') : 'NOTIFY_EMAIL is empty, so only the requester is invited.');
 }

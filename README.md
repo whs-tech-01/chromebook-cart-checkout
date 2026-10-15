@@ -38,6 +38,21 @@ GitHub Pages can only host static files, so it can't write to Google Calendar by
 5. Click the ⚙️ **Project Settings** and set the **Time zone** to your school's time zone. Booking times use this time zone.
 6. Back in the editor, choose the `testSetup` function from the dropdown and click **Run**. Approve the permissions prompt. (You may see a "Google hasn't verified this app" screen. Click **Advanced → Go to project**. It's your own script.) The log should say `Connected to calendar: …`, how long warming the calendar cache took, and who new bookings will invite. `testSetup` also installs a trigger that refreshes the calendar cache every 5 minutes, so the form loads quickly. It's safe to run again.
 
+### Fast calendar loading (recommended)
+
+Loading the calendar from Google can take 10–30 seconds on some school networks. The script can instead publish the bookings to `data/bookings.json` in this repo every 5 minutes, and right after each booking. The form then loads the calendar from its own site in under a second.
+
+1. On GitHub, go to **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**.
+   - **Name:** `Cart calendar publisher`. **Expiration:** as long as allowed. Put a reminder on your calendar to renew it.
+   - **Repository access:** *Only select repositories* → `chromebook-cart-checkout`.
+   - **Permissions → Repository permissions → Contents:** *Read and write*.
+   - Generate it and copy the token.
+2. In Apps Script, click ⚙️ **Project Settings → Script Properties → Add script property**: name `GITHUB_TOKEN`, value the token. **Save**.
+   The token stays private in Apps Script and is never stored on GitHub.
+3. Run `testSetup`. The log should say `Publishing to GitHub: published N bookings`.
+
+Without a token, everything still works and the calendar just loads from Google. The file is public like the rest of the site, and it lists each booking's date, times, carts, name and location, which is the same information the form's calendar shows.
+
 ## Step 3: Deploy it as a web app
 
 1. Click **Deploy → New deployment**, then the ⚙️ next to "Select type" → **Web app**.

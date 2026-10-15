@@ -441,6 +441,7 @@
       </div>
       <div class="cal-grid" id="cal-grid"></div>
       <div class="legend" id="legend"></div>
+      <p class="hint" id="cal-updated" style="font-size:.8rem;margin-top:6px"></p>
       <div class="day-detail" id="day-detail"></div>
     </aside>
   </main>
@@ -593,9 +594,39 @@
       });
     }
 
+    // The script publishes every booking to data/bookings.json on this site, which loads far
+    // faster than asking Google. Months outside that file (or if it's missing) fall back to the script.
+    let siteData = null;
+    function loadSiteData() {
+      if (!siteData) {
+        siteData = getJson(`data/bookings.json?v=${Date.now()}`, { cache: "no-store" })
+          .then((data) => {
+            if (!data || !Array.isArray(data.bookings) || !data.from || !data.to) throw new Error("bad data");
+            const filled = {};
+            for (let d = parseIso(data.from); iso(d) <= data.to; d.setMonth(d.getMonth() + 1, 1)) {
+              const key = monthKey(d);
+              if (!monthCache[key]) monthCache[key] = filled[key] = { status: "ok", bookings: [], promise: Promise.resolve() };
+            }
+            data.bookings.forEach((b) => { const e = filled[b.date.slice(0, 7)]; if (e) e.bookings.push(b); });
+            if (data.updated) {
+              $("cal-updated").textContent = "Updated " + new Date(data.updated).toLocaleString(undefined,
+                { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+            }
+            renderCalendar(); checkConflicts();
+            return true;
+          })
+          .catch(() => false);
+      }
+      return siteData;
+    }
+
     async function loadMonth(key, force) {
       if (!configured) return;
       if (monthCache[key] && !force) return monthCache[key].promise;
+      if (!force) {
+        await loadSiteData();
+        if (monthCache[key]) return monthCache[key].promise;
+      }
       const [y, m] = key.split("-").map(Number);
       const from = `${key}-01`, to = iso(new Date(y, m, 0));
       const entry = { status: "loading", bookings: [] };
@@ -810,7 +841,7 @@
         const out = await getJson(cfg.scriptUrl, { method: "POST", body: JSON.stringify(req) });
         if (!out.ok) throw new Error(out.error || "Something went wrong.");
         ["name", "email"].forEach((k) => { try { localStorage.setItem("cart-" + k, req[k]); } catch (err) {} });
-        new Set(req.sessions.map((s) => s.date.slice(0, 7))).forEach((k) => loadMonth(k, true));
+        addLocalBookings(req);
         showDone(req, total);
         resetForm();
       } catch (err) {
@@ -822,6 +853,16 @@
       } finally {
         sending = false;
       }
+    }
+
+    // Show a new booking right away; the published calendar file catches up within a minute or two.
+    function addLocalBookings(req) {
+      const teacher = req.contactName ? `${req.name} (for ${req.contactName})` : req.name;
+      req.sessions.forEach((s) => {
+        const entry = monthCache[s.date.slice(0, 7)];
+        if (entry) entry.bookings.push({ date: s.date, start: s.start, end: s.end, carts: req.carts, teacher, location: req.location });
+      });
+      renderCalendar(); checkConflicts();
     }
 
     function showDone(req, total) {
