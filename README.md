@@ -39,6 +39,7 @@ GitHub Pages can only host static files, so it can't write to Google Calendar by
 1. Click **Deploy → New deployment**, then the ⚙️ next to "Select type" → **Web app**.
 2. Set **Execute as:** *Me*, and **Who has access:** *Anyone*.
    *("Anyone" is required so the GitHub Pages form can reach it. The script only accepts valid cart bookings and checks the email domain if you set one.)*
+   > ⚠️ **Not** "Anyone within *your district*" or "Anyone with a Google account". With those settings the URL works when you open it yourself, because you're signed in, but the form's calendar shows **"Failed to fetch"** and bookings fail. If **Anyone** isn't offered, a Google Workspace admin must allow sharing outside the domain: **Admin console → Apps → Google Workspace → Drive and Docs → Sharing settings**. This can be turned on for just one organizational unit.
 3. Click **Deploy** and copy the **Web app URL** (it ends in `/exec`).
 
 > If you edit `Code.gs` later, use **Deploy → Manage deployments → ✏️ Edit → Version: New version** so the URL stays the same.
