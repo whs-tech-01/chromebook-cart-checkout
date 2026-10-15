@@ -206,7 +206,11 @@ function validate_(r, tz) {
 
   if (!Array.isArray(r.carts) || !r.carts.length) return 'Please choose at least one cart.';
   const cartNames = Object.keys(CARTS);
-  if (r.carts.some(function (c) { return cartNames.indexOf(c) === -1; })) return 'Unknown cart.';
+  const unknown = r.carts.filter(function (c) { return cartNames.indexOf(c) === -1; });
+  if (unknown.length) {
+    console.error('Unknown cart(s) ' + unknown.join(', ') + '. Add them to CARTS in Settings.gs to match config.js.');
+    return 'Unknown cart: ' + unknown.join(', ') + '. Please let the tech office know.';
+  }
   r.carts = cartNames.filter(function (c) { return r.carts.indexOf(c) !== -1; }); // dedupe, keep standard order
 
   if (!Array.isArray(r.sessions) || !r.sessions.length) return 'Please add at least one date.';
