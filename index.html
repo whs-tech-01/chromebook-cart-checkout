@@ -599,16 +599,29 @@
       const [y, m] = key.split("-").map(Number);
       const from = `${key}-01`, to = iso(new Date(y, m, 0));
       const entry = { status: "loading", bookings: [] };
+      // Show the last copy this browser saw right away, then refresh it in the background.
+      const storeKey = "cart-month-" + key;
+      try {
+        const saved = JSON.parse(localStorage.getItem(storeKey) || "null");
+        if (saved && Array.isArray(saved.bookings)) { entry.bookings = saved.bookings; entry.status = "ok"; entry.stale = true; }
+      } catch (err) {}
       const fetchMonth = async () => {
         const data = await getJson(`${cfg.scriptUrl}?from=${from}&to=${to}`);
         if (!data.ok) throw new Error(data.error);
         return data;
       };
       entry.promise = limited(() => fetchMonth().catch(() => wait(1500).then(fetchMonth))) // one retry
-        .then((data) => { entry.bookings = data.bookings; entry.status = "ok"; })
-        .catch((err) => { entry.status = "error"; entry.error = err.message; })
+        .then((data) => {
+          entry.bookings = data.bookings; entry.status = "ok"; entry.stale = false;
+          try { localStorage.setItem(storeKey, JSON.stringify({ bookings: data.bookings })); } catch (err) {}
+        })
+        .catch((err) => {
+          if (entry.stale) { entry.stale = false; return; } // keep showing the saved copy
+          entry.status = "error"; entry.error = err.message;
+        })
         .finally(() => { renderCalendar(); checkConflicts(); });
       monthCache[key] = entry;
+      if (entry.stale) { renderCalendar(); checkConflicts(); }
       return entry.promise;
     }
     const bookingsOn = (date) => (monthCache[date.slice(0, 7)] || { bookings: [] }).bookings.filter((b) => b.date === date);
@@ -640,7 +653,8 @@
       viewMonth = new Date(d.getFullYear(), d.getMonth(), 1);
       if (select) selectedDay = select;
       renderCalendar();
-      loadMonth(monthKey(viewMonth));
+      loadMonth(monthKey(viewMonth))
+        .then(() => loadMonth(monthKey(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1)))); // preload next month
     }
     $("prev").addEventListener("click", () => showMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1)));
     $("next").addEventListener("click", () => showMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1)));

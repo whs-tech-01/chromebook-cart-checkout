@@ -12,6 +12,7 @@
 const TITLE_PREFIX = '[Chromebook] ';
 const CART_SEP = ' + ';
 const NAME_SEP = ' — ';
+const CACHE_SECONDS = 180;
 
 /** Book one or more carts for one or more dates. Called by the form with a JSON body. */
 function doPost(e) {
@@ -140,16 +141,15 @@ function list_(e) {
   const end = new Date(Utilities.parseDate(to + ' 00:00', tz, 'yyyy-MM-dd HH:mm').getTime() + 24 * 60 * 60 * 1000);
   if (end <= start || end - start > 62 * 24 * 60 * 60 * 1000) return json_({ ok: false, error: 'Range too large.' });
 
-  // Cache each range for a minute so many people loading the calendar don't hit Calendar's limits.
+  // Cache each range for a few minutes so most page loads skip Calendar entirely.
   // A new booking changes the version, so it shows up right away. Edits made directly in
-  // Google Calendar can take up to a minute to appear.
+  // Google Calendar can take up to CACHE_SECONDS to appear.
   const cache = CacheService.getScriptCache();
   const key = ['bookings', version_(), from, to].join(':');
   const cached = cache.get(key);
   if (cached) return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
 
-  const cal = retry_(function () { return CalendarApp.getCalendarById(CALENDAR_ID); });
-  const bookings = retry_(function () { return bookingsBetween_(cal, start, end); }).map(function (b) {
+  const bookings = retry_(function () { return bookingsBetween_(null, start, end); }).map(function (b) {
     return {
       date: Utilities.formatDate(b.start, tz, 'yyyy-MM-dd'),
       start: Utilities.formatDate(b.start, tz, 'HH:mm'),
@@ -160,8 +160,37 @@ function list_(e) {
     };
   });
   const text = JSON.stringify({ ok: true, bookings: bookings });
-  try { cache.put(key, text, 60); } catch (err) { console.warn('Cache put failed: ' + err); }
+  try { cache.put(key, text, CACHE_SECONDS); } catch (err) { console.warn('Cache put failed: ' + err); }
   return ContentService.createTextOutput(text).setMimeType(ContentService.MimeType.JSON);
+}
+
+function bookingsViaApi_(start, end) {
+  const out = [];
+  let pageToken;
+  do {
+    const page = Calendar.Events.list(CALENDAR_ID, {
+      timeMin: start.toISOString(),
+      timeMax: end.toISOString(),
+      singleEvents: true, // expands repeating events into one entry per day
+      maxResults: 2500,
+      pageToken: pageToken,
+      fields: 'nextPageToken,items(summary,location,start,end,status)',
+    });
+    (page.items || []).forEach(function (ev) {
+      if (ev.status === 'cancelled' || !ev.start || !ev.start.dateTime) return; // skip all-day events
+      if (!ev.summary || ev.summary.indexOf(TITLE_PREFIX) !== 0) return;
+      const parts = ev.summary.slice(TITLE_PREFIX.length).split(NAME_SEP);
+      out.push({
+        carts: parts[0].split(CART_SEP),
+        teacher: parts.slice(1).join(NAME_SEP),
+        location: ev.location || '',
+        start: new Date(ev.start.dateTime),
+        end: new Date(ev.end.dateTime),
+      });
+    });
+    pageToken = page.nextPageToken;
+  } while (pageToken);
+  return out;
 }
 
 function version_() {
@@ -172,7 +201,14 @@ function bumpVersion_() {
   PropertiesService.getScriptProperties().setProperty('BOOKINGS_VERSION', String(Date.now()));
 }
 
+/**
+ * Cart bookings overlapping [start, end). With the Google Calendar API service added
+ * (Services > Google Calendar API) this is one fast request; otherwise it falls back to
+ * CalendarApp, which makes a slow call for every property of every event.
+ */
 function bookingsBetween_(cal, start, end) {
+  if (typeof Calendar !== 'undefined') return bookingsViaApi_(start, end);
+  cal = cal || CalendarApp.getCalendarById(CALENDAR_ID);
   return cal.getEvents(start, end)
     .filter(function (ev) { return ev.getTitle().indexOf(TITLE_PREFIX) === 0; })
     .map(function (ev) {
@@ -255,5 +291,8 @@ function testSetup() {
   const cal = CalendarApp.getCalendarById(CALENDAR_ID);
   if (!cal) throw new Error('Calendar not found. Check CALENDAR_ID.');
   Logger.log('Connected to calendar: ' + cal.getName() + ' (time zone ' + Session.getScriptTimeZone() + ')');
+  Logger.log(typeof Calendar !== 'undefined'
+    ? 'Google Calendar API service is on (fast calendar loading).'
+    : 'Add Services > Google Calendar API for much faster calendar loading.');
   Logger.log(notifyList_().length ? 'New bookings will invite: ' + notifyList_().join(', ') : 'NOTIFY_EMAIL is empty, so only the requester is invited.');
 }
