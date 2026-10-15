@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Chromebook Cart Checkout</title>
+  <title>Chromebook Cart Event Checkout</title>
   <link rel="icon" href="assets/logo.jpg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,8 +12,10 @@
     :root {
       --green: #03462b;
       --green-dark: #022e1c;
+      --green-mid: #3e8e5e;
       --green-tint: #e7f0eb;
       --gold: #f9c906;
+      --gold-dark: #c79f00;
       --gold-soft: #fff6cc;
       --ink: #14211a;
       --muted: #55655c;
@@ -22,6 +24,7 @@
       --card: #ffffff;
       --error: #a61b1b;
       --error-bg: #fdecec;
+      --warn: #7a5a00;
     }
     * { box-sizing: border-box; }
     body {
@@ -31,6 +34,8 @@
       color: var(--ink);
       background: var(--bg);
     }
+    a { color: var(--green); font-weight: 600; }
+
     header {
       background: var(--green);
       border-bottom: 6px solid var(--gold);
@@ -38,7 +43,7 @@
       padding: 20px 16px;
     }
     .header-inner {
-      max-width: 960px;
+      max-width: 1120px;
       margin: 0 auto;
       display: flex;
       align-items: center;
@@ -58,21 +63,21 @@
       font-weight: 400;
       color: var(--gold);
       margin: 0;
-      font-size: clamp(1.5rem, 4vw, 2.3rem);
-      line-height: 1.1;
+      font-size: clamp(1.4rem, 4vw, 2.3rem);
+      line-height: 1.15;
     }
     header p { margin: 6px 0 0; opacity: .9; }
 
     main {
-      max-width: 960px;
-      margin: 28px auto 48px;
+      max-width: 1120px;
+      margin: 28px auto 40px;
       padding: 0 16px;
       display: grid;
-      grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+      grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
       gap: 24px;
       align-items: start;
     }
-    @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+    @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
 
     .card {
       background: var(--card);
@@ -81,18 +86,29 @@
       border-radius: 10px;
       padding: 22px;
     }
-    .card h2 {
-      margin: 0 0 16px;
-      color: var(--green);
-      font-size: 1.3rem;
+    .card h2 { margin: 0 0 14px; color: var(--green); font-size: 1.3rem; }
+    #cal-card { position: sticky; top: 16px; }
+    @media (max-width: 860px) { #cal-card { position: static; } }
+
+    .notice {
+      background: var(--gold-soft);
+      border-left: 5px solid var(--gold);
+      border-radius: 6px;
+      padding: 12px 14px;
+      margin: 0 0 22px;
+      font-weight: 700;
+      font-size: .95rem;
     }
+    .notice p { margin: 0; }
+    .notice p + p { margin-top: 8px; }
+    .intro { margin: 0 0 14px; }
 
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
-    @media (max-width: 480px) { .row { grid-template-columns: 1fr; } }
-
-    label { display: block; font-weight: 600; margin: 0 0 6px; }
-    .optional { font-weight: 400; color: var(--muted); }
-    .field { margin-bottom: 16px; }
+    @media (max-width: 520px) { .row { grid-template-columns: 1fr; } }
+    .field { margin-bottom: 20px; }
+    label, .label { display: block; font-weight: 600; margin: 0 0 6px; }
+    .req { color: var(--error); }
+    .help { color: var(--muted); font-size: .92rem; margin: -2px 0 8px; }
     input, select, textarea {
       width: 100%;
       font: inherit;
@@ -103,14 +119,70 @@
       background: #fff;
     }
     textarea { min-height: 80px; resize: vertical; }
-    input:focus, select:focus, textarea:focus, button:focus-visible {
+    input:focus, select:focus, textarea:focus, button:focus-visible, .cart-opt input:focus-visible + span {
       outline: 3px solid var(--gold);
       outline-offset: 1px;
       border-color: var(--green);
     }
     .hp { position: absolute; left: -9999px; }
 
-    button {
+    /* Cart checkboxes */
+    .carts { display: grid; gap: 8px; }
+    .cart-opt {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border: 1.5px solid var(--line);
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 400;
+      margin: 0;
+    }
+    .cart-opt input { width: 20px; height: 20px; accent-color: var(--green); flex-shrink: 0; }
+    .cart-opt:has(input:checked) { border-color: var(--green); background: var(--green-tint); }
+    .cart-opt b { font-weight: 700; }
+    .cart-opt .size { color: var(--muted); }
+    .swatch { width: 12px; height: 12px; border-radius: 50%; margin-left: auto; flex-shrink: 0; box-shadow: 0 0 0 1.5px var(--green-dark) inset; }
+
+    /* Date rows */
+    .session {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr 1fr 40px;
+      gap: 8px;
+      align-items: end;
+      margin-bottom: 4px;
+    }
+    .session small { display: block; color: var(--muted); font-size: .8rem; margin-bottom: 3px; }
+    .session .remove {
+      height: 44px;
+      border: 1.5px solid var(--line);
+      background: #fff;
+      border-radius: 7px;
+      color: var(--muted);
+      font-size: 1.3rem;
+      cursor: pointer;
+    }
+    .session .remove:hover { color: var(--error); border-color: var(--error); }
+    .session-warn { color: var(--warn); font-size: .9rem; font-weight: 600; margin: 2px 0 10px; min-height: 0; }
+    .session-warn:empty { margin: 0 0 10px; }
+    @media (max-width: 520px) {
+      .session { grid-template-columns: 1fr 1fr 40px; }
+      .session .date-cell { grid-column: 1 / -1; }
+    }
+    .add-day {
+      font: inherit;
+      font-weight: 600;
+      color: var(--green);
+      background: none;
+      border: 1.5px dashed var(--green);
+      border-radius: 7px;
+      padding: 8px 14px;
+      cursor: pointer;
+    }
+    .add-day:hover { background: var(--green-tint); }
+
+    .submit {
       width: 100%;
       font: inherit;
       font-weight: 700;
@@ -121,45 +193,75 @@
       background: var(--gold);
       color: var(--green-dark);
       cursor: pointer;
-      box-shadow: 0 3px 0 #c79f00;
+      box-shadow: 0 3px 0 var(--gold-dark);
     }
-    button:hover { background: #ffd51f; }
-    button:active { transform: translateY(2px); box-shadow: 0 1px 0 #c79f00; }
-    button[disabled] { opacity: .6; cursor: wait; }
+    .submit:hover { background: #ffd51f; }
+    .submit:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--gold-dark); }
+    .submit[disabled] { opacity: .6; cursor: wait; }
 
-    .msg {
-      display: none;
-      margin-top: 16px;
-      padding: 12px 14px;
-      border-radius: 7px;
-      font-weight: 600;
-    }
+    .msg { display: none; margin-top: 16px; padding: 12px 14px; border-radius: 7px; font-weight: 600; }
     .msg.show { display: block; }
     .msg.ok { background: var(--green-tint); color: var(--green); border-left: 5px solid var(--green); }
     .msg.err { background: var(--error-bg); color: var(--error); border-left: 5px solid var(--error); }
 
-    #availability .hint { color: var(--muted); margin: 0; }
-    .cart-block { margin-bottom: 14px; }
-    .cart-block h3 {
-      margin: 0 0 6px;
-      font-size: 1rem;
+    /* Mini calendar */
+    .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .cal-head h3 { margin: 0; font-size: 1.1rem; }
+    .cal-nav {
+      width: 36px; height: 36px;
+      border: 1.5px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+      color: var(--green);
+      font-size: 1.2rem;
+      cursor: pointer;
+    }
+    .cal-nav:hover { border-color: var(--green); }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+    .cal-dow { text-align: center; font-size: .78rem; font-weight: 700; color: var(--muted); padding: 2px 0 4px; }
+    .cal-day {
+      aspect-ratio: 1 / 1;
+      min-height: 38px;
+      border: 1.5px solid transparent;
+      border-radius: 7px;
+      background: #fff;
+      font: inherit;
+      font-size: .95rem;
+      color: var(--ink);
+      cursor: pointer;
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 8px;
+      justify-content: center;
+      gap: 3px;
+      padding: 0;
     }
-    .pill {
-      font-size: .78rem;
-      font-weight: 700;
-      padding: 2px 8px;
-      border-radius: 99px;
+    .cal-day:hover { background: var(--green-tint); }
+    .cal-day.other { visibility: hidden; }
+    .cal-day.past { color: #a3aea8; }
+    .cal-day.today { border-color: var(--gold); font-weight: 700; }
+    .cal-day.picked { background: var(--gold-soft); }
+    .cal-day.selected { background: var(--green); color: #fff; }
+    .dots { display: flex; gap: 3px; height: 7px; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 0 1px var(--green-dark) inset; }
+    .cal-day.selected .dot { box-shadow: 0 0 0 1px #fff inset; }
+    .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 12px 0 0; font-size: .88rem; color: var(--muted); }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .day-detail { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 14px; }
+    .day-detail h4 { margin: 0 0 8px; font-size: 1rem; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .day-detail ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    .day-detail li { background: var(--bg); border-radius: 7px; padding: 8px 10px; font-size: .93rem; }
+    .day-detail li .t { font-weight: 700; }
+    .day-detail li .m { color: var(--muted); }
+    .hint { color: var(--muted); margin: 0; font-size: .93rem; }
+    .use-day {
+      font: inherit; font-size: .85rem; font-weight: 700;
+      background: var(--gold); color: var(--green-dark);
+      border: 0; border-radius: 6px; padding: 5px 10px; cursor: pointer;
     }
-    .pill.free { background: var(--green-tint); color: var(--green); }
-    .pill.busy { background: var(--gold-soft); color: #6b5600; }
-    .cart-block ul { margin: 0; padding-left: 18px; color: var(--muted); }
-    .cart-block.selected h3 { color: var(--green); }
-    .cart-block.selected h3::before { content: "▸"; color: var(--gold); }
+    .use-day:hover { background: #ffd51f; }
 
-    footer { text-align: center; color: var(--muted); font-size: .9rem; padding-bottom: 32px; }
+    footer { text-align: center; color: var(--muted); font-size: .95rem; padding: 0 16px 32px; }
   </style>
 </head>
 <body>
@@ -167,193 +269,351 @@
     <div class="header-inner">
       <img src="assets/logo.jpg" alt="Vikings Pride logo">
       <div>
-        <h1>Chromebook Cart Checkout</h1>
-        <p>Reserve a cart for your class. Your booking goes straight onto the shared calendar.</p>
+        <h1>Chromebook Cart Event Checkout</h1>
+        <p>Reserve Chromebook carts for special events. Bookings go straight onto the shared calendar.</p>
       </div>
     </div>
   </header>
 
   <main>
     <section class="card">
-      <h2>Request a cart</h2>
+      <p class="intro">This form is for reserving Chromebook carts for special events.</p>
+      <div class="notice">
+        <p>Please make sure you put every Chromebook back in the correct cart and plug them in.</p>
+        <p>If any are missing at the end of your event, please notify I.T. or the librarian so the next person using the carts isn't affected.</p>
+      </div>
+
       <form id="form" novalidate>
         <div class="row">
           <div class="field">
-            <label for="name">Your name</label>
-            <input id="name" name="name" autocomplete="name" required>
+            <label for="name">Your name <span class="req">*</span></label>
+            <input id="name" name="name" autocomplete="name">
           </div>
           <div class="field">
-            <label for="email">School email</label>
-            <input id="email" name="email" type="email" autocomplete="email" required>
+            <label for="email">School email <span class="req">*</span></label>
+            <input id="email" name="email" type="email" autocomplete="email">
           </div>
         </div>
-        <div class="row">
-          <div class="field">
-            <label for="room">Room number</label>
-            <input id="room" name="room" required>
-          </div>
-          <div class="field">
-            <label for="cart">Cart</label>
-            <select id="cart" name="cart" required></select>
-          </div>
-        </div>
+
+        <fieldset class="field" style="border:0;padding:0;margin:0 0 20px">
+          <legend class="label">How many carts do you need? <span class="req">*</span></legend>
+          <div class="carts" id="carts"></div>
+        </fieldset>
+
         <div class="field">
-          <label for="date">Date</label>
-          <input id="date" name="date" type="date" required>
+          <span class="label">Date(s) and times of your event <span class="req">*</span></span>
+          <p class="help">What time would you like the carts to arrive? We can move carts during work hours, <b id="hours"></b>. Add a row for each day of your event.</p>
+          <div id="sessions"></div>
+          <button type="button" class="add-day" id="add-day">+ Add another day</button>
         </div>
-        <div class="row">
-          <div class="field">
-            <label for="start">Start time</label>
-            <select id="start" name="start" required></select>
-          </div>
-          <div class="field">
-            <label for="end">End time</label>
-            <select id="end" name="end" required></select>
-          </div>
-        </div>
+
         <div class="field">
-          <label for="students">Number of students <span class="optional">(optional)</span></label>
-          <input id="students" name="students" type="number" min="1" max="60" inputmode="numeric">
+          <label for="location">Location of the event <span class="req">*</span></label>
+          <p class="help">Where would you like us to park your cart(s)? <i>e.g. Library, Cafeteria, Gym foyer</i></p>
+          <input id="location" name="location">
         </div>
+
         <div class="field">
-          <label for="notes">Notes <span class="optional">(optional)</span></label>
-          <textarea id="notes" name="notes" placeholder="Class, activity, anything the tech team should know"></textarea>
+          <label for="notes">Any other notes for us?</label>
+          <textarea id="notes" name="notes"></textarea>
         </div>
+
         <div class="hp" aria-hidden="true">
           <label for="website">Leave this empty</label>
           <input id="website" name="website" tabindex="-1" autocomplete="off">
         </div>
-        <button id="submit" type="submit">Reserve cart</button>
+        <button id="submit" class="submit" type="submit">Reserve carts</button>
         <div id="msg" class="msg" role="status" aria-live="polite"></div>
       </form>
     </section>
 
-    <aside class="card" id="availability">
-      <h2>Availability</h2>
-      <div id="avail-body"><p class="hint">Pick a date to see which carts are already booked.</p></div>
+    <aside class="card" id="cal-card" aria-label="Cart calendar">
+      <h2>Cart calendar</h2>
+      <div class="cal-head">
+        <button type="button" class="cal-nav" id="prev" aria-label="Previous month">‹</button>
+        <h3 id="month-label"></h3>
+        <button type="button" class="cal-nav" id="next" aria-label="Next month">›</button>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+      <div class="legend" id="legend"></div>
+      <div class="day-detail" id="day-detail"></div>
     </aside>
   </main>
 
-  <footer>Questions? Contact the tech office.</footer>
+  <footer id="footer"></footer>
 
   <script src="config.js"></script>
   <script>
     const cfg = window.CART_CONFIG;
     const $ = (id) => document.getElementById(id);
-    const form = $("form");
-    const msg = $("msg");
-    let bookings = null;
+    const configured = cfg.scriptUrl && !cfg.scriptUrl.startsWith("PASTE");
+    const CART_COLORS = ["#03462b", "#f9c906", "#ffffff", "#9c7a00", "#8fc3a4"];
+    const cartColor = (name) => CART_COLORS[cfg.carts.findIndex((c) => c.name === name) % CART_COLORS.length] || "#999";
 
-    // Remember name/email/room on this device so returning teachers don't retype.
-    const remembered = ["name", "email", "room"];
-    remembered.forEach((k) => {
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+
+    // ---------- Dates & times ----------
+    const pad = (n) => String(n).padStart(2, "0");
+    const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const parseIso = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+    const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+    const toHHMM = (m) => pad(Math.floor(m / 60)) + ":" + pad(m % 60);
+    const timeLabel = (t) => { const m = toMin(t), h = Math.floor(m / 60); return `${((h + 11) % 12) + 1}:${pad(m % 60)} ${h < 12 ? "AM" : "PM"}`; };
+    const dateLabel = (s) => parseIso(s).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    const todayIso = iso(new Date());
+
+    // Arrival times are limited to delivery hours; end times can run into the evening.
+    const arriveOpts = [], endOpts = [];
+    for (let m = toMin(cfg.deliveryStart); m <= toMin(cfg.deliveryEnd); m += 15) arriveOpts.push(toHHMM(m));
+    for (let m = toMin(cfg.deliveryStart) + 15; m <= toMin(cfg.dayEnd); m += 15) endOpts.push(toHHMM(m));
+    $("hours").textContent = `${timeLabel(cfg.deliveryStart)} – ${timeLabel(cfg.deliveryEnd)}`;
+    const optionsHtml = (list) => list.map((t) => `<option value="${t}">${timeLabel(t)}</option>`).join("");
+
+    // ---------- Footer ----------
+    $("footer").innerHTML = `Questions? Contact the <a href="mailto:${escapeHtml(cfg.contactEmail)}">tech office</a>.`;
+
+    // ---------- Remembered fields ----------
+    ["name", "email"].forEach((k) => {
       try { const v = localStorage.getItem("cart-" + k); if (v) $(k).value = v; } catch (e) {}
     });
 
-    // Carts
-    $("cart").innerHTML = '<option value="">Choose a cart…</option>' +
-      cfg.carts.map((c) => `<option>${escapeHtml(c)}</option>`).join("");
+    // ---------- Cart checkboxes ----------
+    $("carts").innerHTML = cfg.carts.map((c) => `
+      <label class="cart-opt">
+        <input type="checkbox" name="carts" value="${escapeHtml(c.name)}">
+        <span><b>${escapeHtml(c.name)}</b> <span class="size">(${c.size} Chromebooks)</span></span>
+        <span class="swatch" style="background:${cartColor(c.name)}" aria-hidden="true"></span>
+      </label>`).join("");
+    $("carts").addEventListener("change", checkConflicts);
+    const selectedCarts = () => [...document.querySelectorAll('input[name="carts"]:checked')].map((i) => i.value);
 
-    // Times in 15-minute steps
-    const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
-    const toHHMM = (m) => String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
-    const toLabel = (m) => {
-      const h = Math.floor(m / 60), mm = String(m % 60).padStart(2, "0");
-      return `${((h + 11) % 12) + 1}:${mm} ${h < 12 ? "AM" : "PM"}`;
-    };
-    const opts = [];
-    for (let m = toMin(cfg.dayStart); m <= toMin(cfg.dayEnd); m += 15) opts.push(m);
-    $("start").innerHTML = opts.slice(0, -1).map((m) => `<option value="${toHHMM(m)}">${toLabel(m)}</option>`).join("");
-    function fillEnd() {
-      const s = toMin($("start").value);
-      const prev = $("end").value;
-      $("end").innerHTML = opts.filter((m) => m > s).map((m) => `<option value="${toHHMM(m)}">${toLabel(m)}</option>`).join("");
-      if (prev && toMin(prev) > s) $("end").value = prev;
-      else $("end").value = toHHMM(Math.min(s + 60, toMin(cfg.dayEnd)));
+    // ---------- Session rows (one per day) ----------
+    let lastFocusedDate = null;
+
+    function addSession(date = "", start = "08:00", end = "15:00") {
+      const row = document.createElement("div");
+      row.className = "session-wrap";
+      row.innerHTML = `
+        <div class="session">
+          <div class="date-cell"><small>Date</small><input type="date" class="s-date" min="${todayIso}" aria-label="Date"></div>
+          <div><small>Carts arrive</small><select class="s-start" aria-label="Carts arrive">${optionsHtml(arriveOpts)}</select></div>
+          <div><small>Event ends</small><select class="s-end" aria-label="Event ends"></select></div>
+          <button type="button" class="remove" aria-label="Remove this day" title="Remove this day">×</button>
+        </div>
+        <div class="session-warn" aria-live="polite"></div>`;
+      const d = row.querySelector(".s-date"), s = row.querySelector(".s-start"), e = row.querySelector(".s-end");
+      d.value = date;
+      s.value = arriveOpts.includes(start) ? start : arriveOpts[0];
+      fillEnd(s, e, end);
+      s.addEventListener("change", () => { fillEnd(s, e, e.value); checkConflicts(); });
+      e.addEventListener("change", checkConflicts);
+      d.addEventListener("change", () => { if (d.value) showMonth(parseIso(d.value), d.value); checkConflicts(); });
+      d.addEventListener("focus", () => { lastFocusedDate = d; });
+      row.querySelector(".remove").addEventListener("click", () => {
+        if (document.querySelectorAll(".session-wrap").length > 1) row.remove();
+        else { d.value = ""; }
+        updateRemoveButtons(); checkConflicts(); renderCalendar();
+      });
+      $("sessions").appendChild(row);
+      updateRemoveButtons();
+      return row;
     }
-    $("start").addEventListener("change", fillEnd);
-    fillEnd();
+    function fillEnd(startSel, endSel, want) {
+      const after = endOpts.filter((t) => toMin(t) > toMin(startSel.value));
+      endSel.innerHTML = optionsHtml(after);
+      endSel.value = after.includes(want) ? want : after[Math.min(3, after.length - 1)];
+    }
+    function updateRemoveButtons() {
+      const rows = document.querySelectorAll(".session-wrap");
+      rows.forEach((r) => { r.querySelector(".remove").style.visibility = rows.length > 1 ? "visible" : "hidden"; });
+    }
+    function getSessions() {
+      return [...document.querySelectorAll(".session-wrap")].map((r) => ({
+        el: r,
+        date: r.querySelector(".s-date").value,
+        start: r.querySelector(".s-start").value,
+        end: r.querySelector(".s-end").value,
+      }));
+    }
 
-    // Default date: today (local), no past dates
-    const today = new Date();
-    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    $("date").min = iso(today);
-    $("date").value = iso(today);
+    // "+ Add another day": next day after the last row, same times.
+    $("add-day").addEventListener("click", () => {
+      const rows = getSessions();
+      const last = rows[rows.length - 1];
+      let next = "";
+      if (last && last.date) { const d = parseIso(last.date); d.setDate(d.getDate() + 1); next = iso(d); }
+      const row = addSession(next, last ? last.start : undefined, last ? last.end : undefined);
+      row.querySelector(".s-date").focus();
+      checkConflicts(); renderCalendar();
+    });
 
-    const configured = cfg.scriptUrl && !cfg.scriptUrl.startsWith("PASTE");
+    addSession();
 
-    async function loadAvailability() {
-      const date = $("date").value;
-      const body = $("avail-body");
-      if (!date) return;
-      if (!configured) {
-        body.innerHTML = '<p class="hint">Not connected yet: add your Web app URL to config.js.</p>';
-        return;
+    // ---------- Booking data (cached per month) ----------
+    const monthCache = {}; // "YYYY-MM" -> { status, bookings }
+    const monthKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+
+    async function loadMonth(key, force) {
+      if (!configured) return;
+      if (monthCache[key] && !force) return monthCache[key].promise;
+      const [y, m] = key.split("-").map(Number);
+      const from = `${key}-01`, to = iso(new Date(y, m, 0));
+      const entry = { status: "loading", bookings: [] };
+      entry.promise = fetch(`${cfg.scriptUrl}?from=${from}&to=${to}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (!data.ok) throw new Error(data.error);
+          entry.bookings = data.bookings; entry.status = "ok";
+        })
+        .catch(() => { entry.status = "error"; })
+        .finally(() => { renderCalendar(); checkConflicts(); });
+      monthCache[key] = entry;
+      return entry.promise;
+    }
+    const bookingsOn = (date) => (monthCache[date.slice(0, 7)] || { bookings: [] }).bookings.filter((b) => b.date === date);
+
+    // ---------- Conflict warnings under each day ----------
+    function checkConflicts() {
+      const carts = selectedCarts();
+      getSessions().forEach((s) => {
+        const warn = s.el.querySelector(".session-warn");
+        if (!s.date || !carts.length) { warn.textContent = ""; return; }
+        const key = s.date.slice(0, 7);
+        if (!monthCache[key]) { loadMonth(key); }
+        const clashes = bookingsOn(s.date).filter((b) =>
+          toMin(b.start) < toMin(s.end) && toMin(s.start) < toMin(b.end) && b.carts.some((c) => carts.includes(c)));
+        warn.textContent = clashes.map((b) =>
+          `⚠ ${b.carts.filter((c) => carts.includes(c)).join(" & ")} already booked ${timeLabel(b.start)}–${timeLabel(b.end)} (${b.teacher})`
+        ).join(" · ");
+      });
+    }
+
+    // ---------- Mini calendar ----------
+    let viewMonth = new Date(); viewMonth.setDate(1);
+    let selectedDay = todayIso;
+
+    $("legend").innerHTML = cfg.carts.map((c) =>
+      `<span><i class="dot" style="background:${cartColor(c.name)}"></i>${escapeHtml(c.name)}</span>`).join("");
+
+    function showMonth(d, select) {
+      viewMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+      if (select) selectedDay = select;
+      renderCalendar();
+      loadMonth(monthKey(viewMonth));
+    }
+    $("prev").addEventListener("click", () => showMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1)));
+    $("next").addEventListener("click", () => showMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1)));
+
+    function renderCalendar() {
+      const y = viewMonth.getFullYear(), m = viewMonth.getMonth();
+      $("month-label").textContent = viewMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+      const picked = new Set(getSessions().map((s) => s.date).filter(Boolean));
+      const first = new Date(y, m, 1).getDay();
+      const days = new Date(y, m + 1, 0).getDate();
+      let html = ["S", "M", "T", "W", "T", "F", "S"].map((d) => `<div class="cal-dow">${d}</div>`).join("");
+      for (let i = 0; i < first; i++) html += `<div class="cal-day other"></div>`;
+      for (let d = 1; d <= days; d++) {
+        const date = `${y}-${pad(m + 1)}-${pad(d)}`;
+        const booked = new Set(bookingsOn(date).flatMap((b) => b.carts));
+        const dots = cfg.carts.filter((c) => booked.has(c.name))
+          .map((c) => `<i class="dot" style="background:${cartColor(c.name)}"></i>`).join("");
+        const cls = ["cal-day", date < todayIso && "past", date === todayIso && "today",
+          picked.has(date) && "picked", date === selectedDay && "selected"].filter(Boolean).join(" ");
+        const label = `${dateLabel(date)}${booked.size ? `, ${booked.size} cart${booked.size > 1 ? "s" : ""} booked` : ""}`;
+        html += `<button type="button" class="${cls}" data-date="${date}" aria-label="${label}"><span>${d}</span><span class="dots">${dots}</span></button>`;
       }
-      bookings = null;
-      body.innerHTML = '<p class="hint">Loading…</p>';
-      try {
-        const res = await fetch(`${cfg.scriptUrl}?date=${encodeURIComponent(date)}`);
-        const data = await res.json();
-        if (!data.ok) throw new Error(data.error);
-        bookings = data.bookings;
-        renderAvailability();
-      } catch (e) {
-        bookings = null;
-        body.innerHTML = '<p class="hint">Couldn\'t load availability. You can still submit a request.</p>';
+      $("cal-grid").innerHTML = html;
+      renderDayDetail();
+    }
+    $("cal-grid").addEventListener("click", (e) => {
+      const btn = e.target.closest(".cal-day[data-date]");
+      if (!btn) return;
+      selectedDay = btn.dataset.date;
+      renderCalendar();
+    });
+
+    function renderDayDetail() {
+      const el = $("day-detail");
+      if (!configured) { el.innerHTML = '<p class="hint">Not connected yet: add your Web app URL to config.js.</p>'; return; }
+      const entry = monthCache[selectedDay.slice(0, 7)];
+      const canUse = selectedDay >= todayIso;
+      const head = `<h4><span>${dateLabel(selectedDay)}</span>${canUse ? '<button type="button" class="use-day" id="use-day">Book this day</button>' : ""}</h4>`;
+      let body;
+      if (!entry || entry.status === "loading") body = '<p class="hint">Loading…</p>';
+      else if (entry.status === "error") body = '<p class="hint">Couldn\'t load bookings. You can still submit a request.</p>';
+      else {
+        const list = bookingsOn(selectedDay).sort((a, b) => a.start.localeCompare(b.start));
+        body = list.length
+          ? `<ul>${list.map((b) => `<li>
+              <div class="t">${timeLabel(b.start)}–${timeLabel(b.end)}</div>
+              <div>${b.carts.map((c) => `<i class="dot" style="display:inline-block;background:${cartColor(c)}"></i> ${escapeHtml(c)}`).join("&nbsp;&nbsp;")}</div>
+              <div class="m">${escapeHtml(b.teacher)}${b.location ? " · " + escapeHtml(b.location) : ""}</div>
+            </li>`).join("")}</ul>`
+          : '<p class="hint">All carts are available this day.</p>';
       }
+      el.innerHTML = head + body;
+      const use = $("use-day");
+      if (use) use.addEventListener("click", useSelectedDay);
     }
 
-    function renderAvailability() {
-      const sel = $("cart").value;
-      $("avail-body").innerHTML = cfg.carts.map((c) => {
-        const list = bookings.filter((b) => b.cart === c);
-        const pill = list.length
-          ? `<span class="pill busy">${list.length} booking${list.length > 1 ? "s" : ""}</span>`
-          : '<span class="pill free">Open all day</span>';
-        const items = list.map((b) => `<li>${b.start}–${b.end} · ${escapeHtml(b.teacher)}</li>`).join("");
-        return `<div class="cart-block${c === sel ? " selected" : ""}"><h3>${escapeHtml(c)} ${pill}</h3>${items ? `<ul>${items}</ul>` : ""}</div>`;
-      }).join("");
+    // Put the selected calendar day into the form: the last-focused date, else the first empty one, else a new row.
+    function useSelectedDay() {
+      const rows = getSessions();
+      if (rows.some((r) => r.date === selectedDay)) return;
+      let input = lastFocusedDate && document.contains(lastFocusedDate) && !lastFocusedDate.value ? lastFocusedDate : null;
+      if (!input) { const empty = rows.find((r) => !r.date); input = empty && empty.el.querySelector(".s-date"); }
+      if (!input) { const last = rows[rows.length - 1]; input = addSession("", last.start, last.end).querySelector(".s-date"); }
+      input.value = selectedDay;
+      checkConflicts(); renderCalendar();
+      input.closest(".session-wrap").scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
-    $("date").addEventListener("change", loadAvailability);
-    $("cart").addEventListener("change", () => { if (bookings) renderAvailability(); });
-    loadAvailability();
+    showMonth(new Date(), todayIso);
 
-    function show(text, ok) {
-      msg.textContent = text;
-      msg.className = "msg show " + (ok ? "ok" : "err");
-    }
+    // ---------- Submit ----------
+    const msg = $("msg");
+    function show(text, ok) { msg.textContent = text; msg.className = "msg show " + (ok ? "ok" : "err"); }
 
-    form.addEventListener("submit", async (e) => {
+    $("form").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const data = Object.fromEntries(new FormData(form).entries());
-      const missing = ["name", "email", "room", "cart", "date", "start", "end"].find((k) => !data[k].trim());
-      if (missing) { show("Please fill in every required field.", false); $(missing).focus(); return; }
-      if (!configured) { show("This form isn't connected yet. Add the Web app URL to config.js.", false); return; }
+      const name = $("name").value.trim(), email = $("email").value.trim(), location = $("location").value.trim();
+      const carts = selectedCarts();
+      const sessions = getSessions().map(({ date, start, end }) => ({ date, start, end }));
+
+      if (!name) return fail("Please enter your name.", "name");
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail("Please enter a valid email.", "email");
+      if (!carts.length) return fail("Please choose at least one cart.");
+      if (sessions.some((s) => !s.date)) return fail("Please pick a date for each day, or remove the empty row.");
+      if (new Set(sessions.map((s) => s.date)).size !== sessions.length) return fail("The same date is listed twice.");
+      if (!location) return fail("Please enter where the carts should go.", "location");
+      if (!configured) return fail("This form isn't connected yet. Add the Web app URL to config.js.");
 
       $("submit").disabled = true;
       $("submit").textContent = "Reserving…";
       try {
         // text/plain avoids a CORS preflight, which Apps Script doesn't support.
-        const res = await fetch(cfg.scriptUrl, { method: "POST", body: JSON.stringify(data) });
+        const res = await fetch(cfg.scriptUrl, {
+          method: "POST",
+          body: JSON.stringify({ name, email, location, carts, sessions, notes: $("notes").value, website: $("website").value }),
+        });
         const out = await res.json();
         if (!out.ok) throw new Error(out.error || "Something went wrong.");
-        remembered.forEach((k) => { try { localStorage.setItem("cart-" + k, data[k]); } catch (err) {} });
-        show(`You're booked! ${data.cart} on ${data.date}, ${toLabel(toMin(data.start))}–${toLabel(toMin(data.end))}. Check your email for the calendar invite.`, true);
-        $("notes").value = "";
-        $("students").value = "";
-        loadAvailability();
+        ["name", "email"].forEach((k) => { try { localStorage.setItem("cart-" + k, $(k).value.trim()); } catch (err) {} });
+        const when = sessions.map((s) => `${dateLabel(s.date)} ${timeLabel(s.start)}–${timeLabel(s.end)}`).join("; ");
+        show(`You're booked! ${carts.join(" + ")} for ${when}. Check your email for the calendar invite.`, true);
+        new Set(sessions.map((s) => s.date.slice(0, 7))).forEach((k) => loadMonth(k, true));
       } catch (err) {
         show(err.message || "Couldn't reach the calendar. Please try again.", false);
       } finally {
         $("submit").disabled = false;
-        $("submit").textContent = "Reserve cart";
+        $("submit").textContent = "Reserve carts";
       }
     });
-
-    function escapeHtml(s) {
-      return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    function fail(text, focusId) {
+      show(text, false);
+      if (focusId) $(focusId).focus();
     }
   </script>
 </body>

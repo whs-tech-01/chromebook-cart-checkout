@@ -1,6 +1,8 @@
-# Chromebook Cart Checkout
+# Chromebook Cart Event Checkout
 
-A request form, hosted free on GitHub Pages, that teachers use to reserve a Chromebook cart. Each request is added to a Google Calendar.
+A request form, hosted free on GitHub Pages, for reserving Chromebook carts for special events. Each request is added to a Google Calendar, and a month calendar next to the form shows what's already booked.
+
+Live at **https://whs-tech-01.github.io/chromebook-cart-checkout/**
 
 ```
 Teacher fills form  ──►  GitHub Pages (index.html)  ──►  Google Apps Script  ──►  Google Calendar
@@ -28,6 +30,7 @@ GitHub Pages can only host static files, so it can't write to Google Calendar by
    - `CALENDAR_ID`: paste the ID from Step 1.
    - `ALLOWED_EMAIL_DOMAIN`: for example `'@yourschool.org'`, so only school emails are accepted.
    - `CARTS`: your cart names. These must match `config.js`.
+   - `DELIVERY_START` / `DELIVERY_END`: the hours I.T. can move carts. These must match `config.js`.
 4. Click the ⚙️ **Project Settings** and set the **Time zone** to your school's time zone. Booking times use this time zone.
 5. Back in the editor, choose the `testSetup` function from the dropdown and click **Run**. Approve the permissions prompt. (You may see a "Google hasn't verified this app" screen. Click **Advanced → Go to project**. It's your own script.) The log should say `Connected to calendar: …`.
 
@@ -46,12 +49,16 @@ Edit [`config.js`](config.js):
 
 ```js
 scriptUrl: "https://script.google.com/macros/s/XXXXXXXX/exec",
-carts: ["Cart 1", "Cart 2", "Cart 3", "Cart 4"],   // same names as in Code.gs
-dayStart: "07:00",
-dayEnd: "16:00",
+carts: [{ name: "Large Cart", size: 40 }, ...],   // same names as CARTS in Code.gs
+deliveryStart: "07:30",   // "Carts arrive" times are limited to these hours
+deliveryEnd: "15:45",
+dayEnd: "22:00",          // latest an event can end
+contactEmail: "whs@khsd.freshdesk.com",
 ```
 
 Commit the change. The web app URL is safe to put in a public repo because it isn't a password.
+
+> Use the `https://script.google.com/macros/s/.../exec` form of the URL. If the deploy dialog shows `/a/macros/yourdomain/s/...`, remove the `/a/yourdomain` part, or the form won't work for people who aren't signed in to the school domain.
 
 ## Step 5: Turn on GitHub Pages
 
@@ -69,10 +76,12 @@ Commit the change. The web app URL is safe to put in a public repo because it is
 
 ## How it works
 
-- **Double bookings are blocked.** The script checks the calendar before saving and uses a lock so two teachers can't book the same cart at the same moment.
-- **Availability panel.** When a teacher picks a date, the form shows which carts are already booked and by whom.
-- **Event format.** The event title is `[Chromebook] Cart 2 — Jane Smith`, with the room as the location and the details in the description. The script uses the `[Chromebook]` prefix to recognize bookings, so don't rename those events by hand.
+- **Several carts, several days.** One request can book any mix of carts across up to 10 days, each with its own times. "+ Add another day" fills in the next date with the same times.
+- **Double bookings are blocked.** The form warns as soon as a picked cart is already taken. The script checks again before saving, books all days or none, and uses a lock so two people can't take the same cart at the same moment.
+- **Calendar.** The month calendar shows a colored dot for each cart booked on a day. Click a day to see the bookings, then click **Book this day** to add it to the form.
+- **Event format.** One calendar event is created per day. The title is `[Chromebook] Large Cart + Small Cart 1 — Jane Smith`, with the event location as the location and the details in the description. The script uses the `[Chromebook]` prefix to recognize bookings, so don't rename those events by hand.
 - **Cancelling.** Delete the event from Google Calendar, and the slot opens up again.
+- **Updating the script.** After pasting a new `Code.gs`, re-enter your settings, then go to **Deploy → Manage deployments → ✏️ Edit → Version: New version → Deploy**. The URL stays the same.
 - **Spam.** The form has a hidden honeypot field, and `ALLOWED_EMAIL_DOMAIN` restricts submissions to school email addresses.
 
 ## Files
@@ -80,6 +89,6 @@ Commit the change. The web app URL is safe to put in a public repo because it is
 | File | Purpose |
 |---|---|
 | `index.html` | The form page, with green and gold colors from the school logo |
-| `config.js` | Web app URL, cart names, and time range |
+| `config.js` | Web app URL, carts, delivery hours, and contact email |
 | `assets/logo.jpg` | School logo |
 | `apps-script/Code.gs` | Google Apps Script backend. Paste it into script.google.com; it isn't run from GitHub |

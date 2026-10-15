@@ -4,15 +4,21 @@ window.CART_CONFIG = {
   // It ends in /exec.
   scriptUrl: "https://script.google.com/macros/s/AKfycbzEIqrrIzTxpHVTKZRukyIHRk4O_brpiNPogvFB4rBj33IBonpjb08BBFbadlJyd-Tw/exec",
 
-  // The carts teachers can reserve. Names must be unique.
+  // The carts that can be reserved. Names must match CARTS in apps-script/Code.gs.
   carts: [
-    "Cart 1",
-    "Cart 2",
-    "Cart 3",
-    "Cart 4",
+    { name: "Large Cart", size: 40 },
+    { name: "Small Cart 1", size: 36 },
+    { name: "Small Cart 2", size: 36 },
   ],
 
-  // Earliest/latest times shown in the time pickers (24-hour HH:MM).
-  dayStart: "07:00",
-  dayEnd: "16:00",
+  // Carts can only be delivered during I.T. work hours (24-hour HH:MM).
+  // "Carts arrive" times are limited to this window. Must match DELIVERY_* in Code.gs.
+  deliveryStart: "07:30",
+  deliveryEnd: "15:45",
+
+  // Latest time an event can end (24-hour HH:MM).
+  dayEnd: "22:00",
+
+  // "Questions? Contact the tech office." links to this address.
+  contactEmail: "whs@khsd.freshdesk.com",
 };
